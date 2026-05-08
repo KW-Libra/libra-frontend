@@ -73,6 +73,7 @@ const allTurns = computed(() => {
   if (turns.size === 0) turns.add(1);
   return [...turns].sort((a, b) => a - b);
 });
+const lastTurnNumber = computed(() => allTurns.value.at(-1) ?? 1);
 
 const selectedTrace = computed(() => {
   const trace = latestRun.value?.decision?.decision_trace ?? [];
@@ -246,7 +247,7 @@ onMounted(ensureLoaded);
         </span>
         <h2 class="hero-figure">
           <span>turn {{ Math.round(animatedTurn) }}</span>
-          <small> / {{ allTurns.length }}</small>
+          <small> / {{ lastTurnNumber }}</small>
         </h2>
         <div class="hero-delta">
           <span class="delta-meta">{{ urgencyHint }} · {{ calledCount }} consulted</span>

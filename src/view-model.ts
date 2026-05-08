@@ -38,54 +38,119 @@ export type DecisionBadge = {
   message: string;
 };
 
+const AGENT_ORDER = [
+  "judge",
+  "disclosure",
+  "news",
+  "report",
+  "profit",
+  "cost",
+  "risk",
+  "tax",
+  "compliance",
+  "macro",
+  "sentiment",
+  "execution",
+  "esg",
+] as const;
+
 const AGENT_META: Record<string, Omit<AgentView, "status" | "turn" | "signal" | "confidence" | "reason">> = {
-  J: {
-    id: "J",
+  judge: {
+    id: "judge",
     glyph: "J",
     name: "Judge",
     role: "상황 판단, 호출 순서 선택",
     color: "var(--ink)",
   },
-  D: {
-    id: "D",
+  disclosure: {
+    id: "disclosure",
     glyph: "D",
     name: "Disclosure",
     role: "공시 사실 확인",
     color: "var(--pos)",
   },
-  N: {
-    id: "N",
+  news: {
+    id: "news",
     glyph: "N",
     name: "News",
     role: "시장 반응 확인",
     color: "var(--warn)",
   },
-  R: {
-    id: "R",
+  report: {
+    id: "report",
     glyph: "R",
     name: "Report",
     role: "리포트와 컨센서스 확인",
     color: "var(--accent)",
   },
-  P: {
-    id: "P",
+  profit: {
+    id: "profit",
     glyph: "P",
     name: "Profit",
     role: "수익률과 위험 검토",
     color: "var(--ink-3)",
   },
-  C: {
-    id: "C",
+  cost: {
+    id: "cost",
     glyph: "C",
     name: "Cost",
     role: "거래비용과 유동성 확인",
     color: "var(--ink-3)",
   },
+  risk: {
+    id: "risk",
+    glyph: "V",
+    name: "Risk",
+    role: "집중도, 손실, 위험 한도 검토",
+    color: "var(--neg)",
+  },
+  tax: {
+    id: "tax",
+    glyph: "T",
+    name: "Tax",
+    role: "세금 효과와 손실 수확 검토",
+    color: "var(--brass)",
+  },
+  compliance: {
+    id: "compliance",
+    glyph: "K",
+    name: "Compliance",
+    role: "IPS와 사용자 제약 검증",
+    color: "var(--neg)",
+  },
+  macro: {
+    id: "macro",
+    glyph: "M",
+    name: "Macro",
+    role: "거시 환경과 섹터 민감도 검토",
+    color: "var(--seal)",
+  },
+  sentiment: {
+    id: "sentiment",
+    glyph: "S",
+    name: "Sentiment",
+    role: "뉴스 감성과 시장 심리 검토",
+    color: "var(--warn)",
+  },
+  execution: {
+    id: "execution",
+    glyph: "X",
+    name: "Execution",
+    role: "체결 가능성과 시장 충격 검토",
+    color: "var(--pos)",
+  },
+  esg: {
+    id: "esg",
+    glyph: "E",
+    name: "ESG",
+    role: "ESG 제외 룰과 지속가능성 검토",
+    color: "var(--pos)",
+  },
 };
 
 const DEMO_AGENTS: AgentView[] = [
   {
-    ...AGENT_META.J,
+    ...AGENT_META.judge,
     status: "judge",
     turn: "T1",
     signal: 0,
@@ -93,7 +158,7 @@ const DEMO_AGENTS: AgentView[] = [
     reason: "사용자 위임 범위와 포트폴리오 상태를 먼저 해석",
   },
   {
-    ...AGENT_META.D,
+    ...AGENT_META.disclosure,
     status: "called",
     turn: "T2",
     signal: -0.22,
@@ -101,7 +166,7 @@ const DEMO_AGENTS: AgentView[] = [
     reason: "삼성전자 실적 하회 신호가 있어 공시 확인 필요",
   },
   {
-    ...AGENT_META.N,
+    ...AGENT_META.news,
     status: "called",
     turn: "T3",
     signal: 0.08,
@@ -109,7 +174,7 @@ const DEMO_AGENTS: AgentView[] = [
     reason: "공시 신호와 가격 반응이 일치하는지 확인",
   },
   {
-    ...AGENT_META.R,
+    ...AGENT_META.report,
     status: "called",
     turn: "T4",
     signal: 0.04,
@@ -117,7 +182,7 @@ const DEMO_AGENTS: AgentView[] = [
     reason: "뉴스와 공시 신호가 충돌해 증권사 해석 확인",
   },
   {
-    ...AGENT_META.P,
+    ...AGENT_META.profit,
     status: "skipped",
     turn: "skip",
     signal: 0,
@@ -125,7 +190,7 @@ const DEMO_AGENTS: AgentView[] = [
     reason: "리밸런싱 후보가 아직 만들어지지 않음",
   },
   {
-    ...AGENT_META.C,
+    ...AGENT_META.cost,
     status: "skipped",
     turn: "skip",
     signal: 0,
@@ -191,8 +256,8 @@ export function buildAgents(run: JudgeRunResult | null): AgentView[] {
   const called = new Set((run.decision.called_agents ?? run.agent_responses.map((response) => response.agent_id)).map(normalizeAgentId));
   const skipped = new Set((run.decision.skipped_agents ?? []).map(normalizeAgentId));
 
-  return Object.values(AGENT_META).map((meta) => {
-    if (meta.id === "J") {
+  const knownRows = AGENT_ORDER.map((id) => AGENT_META[id]).map((meta) => {
+    if (meta.id === "judge") {
       return {
         ...meta,
         status: "judge",
@@ -215,11 +280,27 @@ export function buildAgents(run: JudgeRunResult | null): AgentView[] {
       confidence: response?.confidence ?? 0.25,
       reason:
         response?.reasoning_for_judge_agent ??
-        run.decision.skip_rationale?.[meta.id] ??
-        run.decision.skip_rationale?.[meta.name.toLowerCase()] ??
+        skipReason(run.decision, meta.id) ??
         "이번 판단에서는 호출 조건이 충족되지 않았습니다.",
     };
   });
+
+  const unknownRows = [...responses.entries()]
+    .filter(([id]) => !AGENT_META[id])
+    .map(([id, response]) => ({
+      id,
+      glyph: id.slice(0, 1).toUpperCase(),
+      name: response.agent_id,
+      role: response.agent_kind ?? "외부 에이전트",
+      color: "var(--ink-3)",
+      status: "called" as const,
+      turn: `T${response.turn_number}`,
+      signal: response.signal_score ?? response.direction ?? 0,
+      confidence: response.confidence,
+      reason: response.reasoning_for_judge_agent || response.query_understood,
+    }));
+
+  return [...knownRows, ...unknownRows];
 }
 
 export function buildTimeline(run: JudgeRunResult | null, currentTurn: number): TimelineStep[] {
@@ -298,14 +379,21 @@ export function maxTurn(timeline: TimelineStep[]) {
 }
 
 function normalizeAgentId(agentId: string) {
-  const lowered = agentId.toLowerCase();
-  if (lowered.startsWith("judge")) return "J";
-  if (lowered.startsWith("disclosure")) return "D";
-  if (lowered.startsWith("news")) return "N";
-  if (lowered.startsWith("report")) return "R";
-  if (lowered.startsWith("profit")) return "P";
-  if (lowered.startsWith("cost")) return "C";
-  return agentId.slice(0, 1).toUpperCase();
+  const lowered = agentId.toLowerCase().replace(/[\s_-]/g, "");
+  if (lowered.startsWith("judge")) return "judge";
+  if (lowered.startsWith("disclosure") || lowered === "dart") return "disclosure";
+  if (lowered.startsWith("news")) return "news";
+  if (lowered.startsWith("report")) return "report";
+  if (lowered.startsWith("profit") || lowered.startsWith("return")) return "profit";
+  if (lowered.startsWith("cost")) return "cost";
+  if (lowered.startsWith("risk") || lowered.includes("vora")) return "risk";
+  if (lowered.startsWith("tax") || lowered.includes("reed")) return "tax";
+  if (lowered.startsWith("compliance") || lowered.includes("clarke")) return "compliance";
+  if (lowered.startsWith("macro") || lowered.includes("halden")) return "macro";
+  if (lowered.startsWith("sentiment") || lowered.includes("imo")) return "sentiment";
+  if (lowered.startsWith("execution") || lowered.includes("tien")) return "execution";
+  if (lowered.startsWith("esg") || lowered.includes("esme")) return "esg";
+  return lowered || agentId;
 }
 
 function displayAgentName(actor: string) {
@@ -316,9 +404,27 @@ function displayAgentName(actor: string) {
 function phaseTitle(phase: string) {
   if (phase === "information_gathering") return "정보 확인";
   if (phase === "deliberation") return "검토";
+  if (phase === "domain_consensus") return "도메인 합의";
+  if (phase === "compliance_check") return "제약 검증";
   if (phase === "consensus") return "신호 종합";
   if (phase === "decision") return "최종 판단";
   return phase;
+}
+
+function skipReason(decision: JudgeDecision, agentId: string) {
+  const rationale = decision.skip_rationale ?? {};
+  const candidates = [
+    agentId,
+    AGENT_META[agentId]?.name,
+    AGENT_META[agentId]?.name.toLowerCase(),
+    normalizeAgentId(agentId),
+  ].filter(Boolean) as string[];
+  for (const key of candidates) {
+    const direct = rationale[key];
+    if (direct) return direct;
+  }
+  const found = Object.entries(rationale).find(([key]) => normalizeAgentId(key) === agentId);
+  return found?.[1];
 }
 
 function formatDateTime(value: string) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -42,6 +42,8 @@ const stockSearchResults = ref<KisStockListing[]>([]);
 const stockSearchState = ref<"idle" | "loading" | "error">("idle");
 const status = ref<"idle" | "loading" | "saving" | "saved" | "error">("idle");
 const notice = ref("투자 기준을 정한 뒤 KIS 종목을 검색해서 목표 비중을 저장합니다.");
+let recommendationLoadStarted = false;
+let stockSearchStarted = false;
 
 const setupSteps = [
   {
@@ -129,6 +131,7 @@ const stepSummary = computed(() => {
 });
 
 async function loadRecommendations() {
+  recommendationLoadStarted = true;
   status.value = "loading";
   notice.value = "성향에 맞는 후보 인덱스를 계산하고 있습니다.";
   try {
@@ -171,6 +174,13 @@ async function selectRecommendation(code: string) {
 }
 
 async function searchStocks() {
+  const term = stockSearchQuery.value.trim();
+  if (term.length < 2) {
+    stockSearchResults.value = [];
+    notice.value = "두 글자 이상 입력하면 KIS 종목 마스터에서 검색합니다.";
+    return;
+  }
+  stockSearchStarted = true;
   stockSearchState.value = "loading";
   try {
     stockSearchResults.value = await searchKisStocks(stockSearchQuery.value, ["KOSPI", "KOSDAQ"], 40);
@@ -268,8 +278,17 @@ function setWeight(item: DraftHolding, value: number) {
   item.weight = Math.max(0, Math.min(1, Number.isFinite(value) ? value / 100 : 0));
 }
 
-onMounted(loadRecommendations);
-onMounted(searchStocks);
+function prepareStepData() {
+  if (step.value !== 2) return;
+  if (mode.value === "recommended" && !recommendationLoadStarted) {
+    void loadRecommendations();
+  }
+  if (mode.value === "custom" && !stockSearchStarted && stockSearchQuery.value.trim().length >= 2) {
+    void searchStocks();
+  }
+}
+
+watch([step, mode], prepareStepData);
 </script>
 
 <template>

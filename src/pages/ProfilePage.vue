@@ -20,7 +20,7 @@ const message = ref(
 const error = ref("");
 
 const form = reactive({
-  environment: "real" as "real" | "demo",
+  environment: "demo" as "real" | "demo",
   appKey: "",
   appSecret: "",
   accountNo: "",
@@ -185,8 +185,8 @@ onMounted(loadStatus);
         <label class="profile-field">
           <span>Environment</span>
           <select v-model="form.environment" class="cell-input">
-            <option value="real">Real</option>
-            <option value="demo">Demo</option>
+            <option value="demo">Demo · 모의투자</option>
+            <option value="real">Real · 실전투자</option>
           </select>
         </label>
 
