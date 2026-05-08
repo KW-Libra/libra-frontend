@@ -111,10 +111,10 @@ function cellTone(state: Cell["state"], turn: number) {
 
       <!-- Legend -->
       <div class="grid-legend">
-        <span class="grid-legend-item" data-state="active">active</span>
-        <span class="grid-legend-item" data-state="done">called</span>
-        <span class="grid-legend-item" data-state="muted">queued</span>
-        <span class="grid-legend-item" data-state="skip">skipped</span>
+        <span class="grid-legend-item" data-state="active">진행 중</span>
+        <span class="grid-legend-item" data-state="done">호출됨</span>
+        <span class="grid-legend-item" data-state="muted">대기</span>
+        <span class="grid-legend-item" data-state="skip">건너뜀</span>
       </div>
     </div>
   </figure>

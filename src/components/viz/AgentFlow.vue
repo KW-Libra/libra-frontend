@@ -172,22 +172,22 @@ watch(
 
 const statusBadge = computed(() => {
   if (props.judgeState === "running") {
-    return { label: "RUNNING", tone: "running" as const };
+    return { label: "실행 중", tone: "running" as const };
   }
   if (props.judgeState === "error") {
-    return { label: "ERROR", tone: "error" as const };
+    return { label: "오류", tone: "error" as const };
   }
   if (props.judgeState === "done") {
-    return { label: "LIVE", tone: "live" as const };
+    return { label: "완료", tone: "live" as const };
   }
-  return { label: "READY", tone: "ready" as const };
+  return { label: "대기", tone: "ready" as const };
 });
 </script>
 
 <template>
   <figure class="funnel-figure" :data-state="judgeState" :data-compact="compact || undefined">
     <figcaption>
-      <span class="funnel-eyebrow">Orchestration</span>
+      <span class="funnel-eyebrow">호출 흐름</span>
       <div class="funnel-status">
         <span
           class="funnel-status-pill"
@@ -197,10 +197,10 @@ const statusBadge = computed(() => {
           {{ statusBadge.label }}
         </span>
         <span class="funnel-meta">
-          <span>{{ calledRows.length }} consulted</span>
+          <span>{{ calledRows.length }}개 검토</span>
           <span class="funnel-meta-sep">·</span>
           <span class="funnel-meta-skip">
-            {{ skippedAgentList.length }} skipped
+            {{ skippedAgentList.length }}개 건너뜀
           </span>
         </span>
       </div>
@@ -347,18 +347,18 @@ const statusBadge = computed(() => {
           letter-spacing="0.02em"
           fill="var(--paper)"
         >
-          JUDGE
+          판단
         </text>
         <text
           x="0"
           y="16"
           text-anchor="middle"
-          font-family="JetBrains Mono, monospace"
-          font-size="10"
-          letter-spacing="0.16em"
+          font-family="Pretendard, sans-serif"
+          font-size="11"
+          letter-spacing="0.08em"
           fill="rgba(255, 255, 255, 0.6)"
         >
-          ORCHESTRATOR
+          엔진
         </text>
         <!-- spinner ring (only when running) -->
         <circle
@@ -403,9 +403,9 @@ const statusBadge = computed(() => {
     <div
       v-if="skippedAgentList.length"
       class="funnel-skipped-row"
-      aria-label="Skipped agents"
+      aria-label="건너뛴 에이전트"
     >
-      <span class="funnel-skipped-label">Skipped</span>
+      <span class="funnel-skipped-label">건너뜀</span>
       <span
         v-for="agent in skippedAgentList"
         :key="`skip-pill-${agent.id}`"

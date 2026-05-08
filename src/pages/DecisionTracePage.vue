@@ -119,7 +119,7 @@ const domainAgentCards = computed<DomainAgentCard[]>(() => {
       response,
       vote,
       confidence: response?.confidence ?? null,
-      rationale: response?.reasoning_for_judge_agent ?? "아직 도메인 에이전트 응답이 없습니다.",
+      rationale: response?.reasoning_for_judge_agent ?? "아직 해당 관점의 응답이 없습니다.",
       signals: parseDomainSignals(response),
       llmUsed,
       adversarialReview: hasAdversarialReview(llmUsed),
@@ -163,7 +163,7 @@ const phaseLabel = (phase: string) => {
   const map: Record<string, string> = {
     information_gathering: "정보 확인",
     deliberation: "검토",
-    domain_consensus: "도메인 합의",
+    domain_consensus: "관점 합의",
     compliance_check: "컴플라이언스",
     consensus: "신호 종합",
     decision: "최종 판단",
@@ -184,6 +184,14 @@ function normalizeVote(response: AgentResponse | null) {
   if (response.direction > 0.05) return "approve";
   if (response.direction < -0.05) return "reject";
   return "abstain";
+}
+
+function voteLabel(vote: string) {
+  if (vote === "approve") return "승인";
+  if (vote === "reject") return "거부";
+  if (vote === "abstain") return "보류";
+  if (vote === "pending") return "대기";
+  return vote;
 }
 
 function parseDomainSignals(response: AgentResponse | null): DomainSignal[] {
@@ -250,8 +258,8 @@ onMounted(ensureLoaded);
           <small> / {{ lastTurnNumber }}</small>
         </h2>
         <div class="hero-delta">
-          <span class="delta-meta">{{ urgencyHint }} · {{ calledCount }} consulted</span>
-          <span class="delta-meta">{{ skippedCount }} skipped</span>
+          <span class="delta-meta">{{ urgencyHint }} · {{ calledCount }}개 검토</span>
+          <span class="delta-meta">{{ skippedCount }}개 건너뜀</span>
           <span class="delta-meta">{{ holdings.length }} holdings · {{ formatKrw(totalValue) }}원</span>
         </div>
       </div>
@@ -346,11 +354,11 @@ onMounted(ensureLoaded);
       <PlanDelta :plan="candidatePlanDelta" :names="holdingNames" />
     </section>
 
-    <!-- ── DOMAIN AGENTS ────────────────────────────────────── -->
+    <!-- ── JUDGEMENT PERSPECTIVES ───────────────────────────── -->
     <section class="domain-agents">
       <header>
-        <span class="block-eyebrow">도메인 에이전트 합의 (7)</span>
-        <span class="block-meta">{{ hasDomainResponses ? "Phase 7 trace" : "waiting for backend signals" }}</span>
+        <span class="block-eyebrow">판단 관점 합의</span>
+        <span class="block-meta">{{ hasDomainResponses ? "실행 결과 반영" : "응답 대기" }}</span>
       </header>
       <div class="domain-grid">
         <article
@@ -365,22 +373,22 @@ onMounted(ensureLoaded);
               <strong>{{ card.label }}</strong>
               <span>{{ card.codename }}</span>
             </div>
-            <span class="vote-pill" :data-vote="card.vote">{{ card.vote }}</span>
+            <span class="vote-pill" :data-vote="card.vote">{{ voteLabel(card.vote) }}</span>
           </header>
           <p class="domain-confidence">
-            confidence
+            신뢰도
             <strong>{{ card.confidence == null ? "—" : `${Math.round(card.confidence * 100)}%` }}</strong>
           </p>
           <p class="domain-rationale" :title="card.rationale">{{ card.rationale }}</p>
-          <span v-if="card.adversarialReview" class="review-badge">Gemini × Claude 적대 검토</span>
+          <span v-if="card.adversarialReview" class="review-badge">복수 모델 검토</span>
           <details class="signal-details">
-            <summary>signals · {{ card.signals.length }}</summary>
+            <summary>신호 · {{ card.signals.length }}</summary>
             <ul v-if="card.signals.length">
               <li v-for="(signal, index) in card.signals" :key="`${card.key}-${index}`">
                 {{ signalLabel(signal) }}
               </li>
             </ul>
-            <p v-else>기록된 domain signal이 없습니다.</p>
+            <p v-else>기록된 신호가 없습니다.</p>
           </details>
         </article>
       </div>

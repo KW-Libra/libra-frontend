@@ -27,7 +27,7 @@ export const navItems: NavItem[] = [
   { path: "/dashboard", glyph: "◈", label: "대시보드", meta: { title: "포트폴리오", eyebrow: "Portfolio" } },
   { path: "/onboarding", glyph: "◇", label: "초기 설정", meta: { title: "초기 설정", eyebrow: "Setup" } },
   { path: "/decision", glyph: "◬", label: "판단 과정", meta: { title: "판단 과정", eyebrow: "Decision Trace" } },
-  { path: "/agents", glyph: "◉", label: "통합 현황", meta: { title: "통합 현황", eyebrow: "Team Modules" } },
+  { path: "/agents", glyph: "◉", label: "에이전트", meta: { title: "에이전트 상태", eyebrow: "Agent Health" } },
   { path: "/indexing", glyph: "◫", label: "목표 비중", meta: { title: "목표 비중", eyebrow: "Target Portfolio" } },
   { path: "/news", glyph: "◭", label: "시장 신호", meta: { title: "시장 신호", eyebrow: "Market Signals" } },
   { path: "/history", glyph: "◷", label: "결정 이력", meta: { title: "결정 이력", eyebrow: "Decision Memory" } },

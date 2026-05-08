@@ -404,7 +404,7 @@ function displayAgentName(actor: string) {
 function phaseTitle(phase: string) {
   if (phase === "information_gathering") return "정보 확인";
   if (phase === "deliberation") return "검토";
-  if (phase === "domain_consensus") return "도메인 합의";
+  if (phase === "domain_consensus") return "관점 합의";
   if (phase === "compliance_check") return "제약 검증";
   if (phase === "consensus") return "신호 종합";
   if (phase === "decision") return "최종 판단";

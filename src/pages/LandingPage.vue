@@ -59,7 +59,7 @@ const issue = String(42 + today.getDate()).padStart(3, "0");
             호출합니다.
           </h2>
           <p class="landing-lead-deck">
-            KIS 잔고 동기화부터 공시·뉴스·리포트 검토, 비용·수익 평가까지 — LangGraph 위에서 다섯 명의 전문가
+        KIS 잔고 동기화부터 공시·뉴스·리포트 검토, 비용·수익 평가까지 — 판단 그래프 위에서 다섯 명의 전문가
             에이전트가 협력해 포트폴리오를 점검합니다. 모든 호출과 미호출은 결정 트레이스에 기록됩니다.
           </p>
           <div class="landing-lead-byline">
@@ -121,7 +121,7 @@ const issue = String(42 + today.getDate()).padStart(3, "0");
 
             <!-- Mono labels at corners -->
             <g font-family="JetBrains Mono, monospace" font-size="9" fill="var(--ink-3)" letter-spacing="0.1em">
-              <text x="12" y="20">N · ORCHESTRATION</text>
+              <text x="12" y="20">N · FLOW</text>
               <text x="240" y="20">SEAL 0001</text>
               <text x="12" y="350">JUDGE—FIRST</text>
               <text x="280" y="350">2026.05</text>

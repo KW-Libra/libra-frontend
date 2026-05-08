@@ -216,6 +216,14 @@ function normalizeVote(response: AgentResponse | null) {
   return "abstain";
 }
 
+function voteLabel(vote: string) {
+  if (vote === "approve") return "승인";
+  if (vote === "reject") return "거부";
+  if (vote === "abstain") return "보류";
+  if (vote === "pending") return "대기";
+  return vote;
+}
+
 function parseDomainSignals(response: AgentResponse | null): DomainSignal[] {
   if (!response) return [];
   const direct = coerceDomainSignals(response.domain_signals);
@@ -351,8 +359,8 @@ onMounted(ensureLoaded);
       <div class="console-main">
         <article class="verdict-card-v2" :data-tone="decisionTone">
           <header>
-            <span class="micro-label">Current Verdict</span>
-            <span class="verdict-stamp">{{ calledCount }} called · {{ skippedCount }} skipped</span>
+              <span class="micro-label">최종 판단</span>
+              <span class="verdict-stamp">{{ calledCount }}개 검토 · {{ skippedCount }}개 건너뜀</span>
           </header>
           <h2>{{ decisionShort }}</h2>
           <p>{{ decisionBadge.message }}</p>
@@ -364,8 +372,8 @@ onMounted(ensureLoaded);
 
         <article class="route-board">
           <header>
-            <span class="micro-label">Judge Route</span>
-            <span class="board-meta">LangGraph orchestration</span>
+            <span class="micro-label">호출 경로</span>
+            <span class="board-meta">실행 순서</span>
           </header>
           <AgentFlow
             compact
@@ -379,8 +387,8 @@ onMounted(ensureLoaded);
 
         <article class="debate-board">
           <header>
-            <span class="micro-label">Agent Debate</span>
-            <RouterLink class="board-link" to="/decision">full trace →</RouterLink>
+            <span class="micro-label">근거 요약</span>
+            <RouterLink class="board-link" to="/decision">전체 보기 →</RouterLink>
           </header>
           <ol>
             <li v-for="row in debateRows" :key="`${row.id}-${row.meta}`" :data-tone="row.tone">
@@ -395,8 +403,8 @@ onMounted(ensureLoaded);
 
         <article class="domain-board">
           <header>
-            <span class="micro-label">7 Domain Agents</span>
-            <span class="board-meta">JYlibra_sample_v1 merged</span>
+            <span class="micro-label">판단 관점</span>
+            <span class="board-meta">7개 검토 신호</span>
           </header>
           <div class="domain-mini-grid">
             <section v-for="card in domainCards" :key="card.key" :data-vote="card.vote">
@@ -404,10 +412,10 @@ onMounted(ensureLoaded);
                 <strong>{{ card.label }}</strong>
                 <span>{{ card.codename }}</span>
               </header>
-              <em>{{ card.vote }}</em>
+              <em>{{ voteLabel(card.vote) }}</em>
               <p>{{ card.confidence == null ? "—" : `${Math.round(card.confidence * 100)}%` }}</p>
               <details>
-                <summary>signals · {{ card.signals.length }}</summary>
+                <summary>신호 · {{ card.signals.length }}</summary>
                 <span v-for="(signal, index) in card.signals.slice(0, 3)" :key="`${card.key}-${index}`">
                   {{ signalLabel(signal) }}
                 </span>
@@ -428,7 +436,7 @@ onMounted(ensureLoaded);
 
         <article class="plan-board">
           <header>
-            <span class="micro-label">Candidate Plan</span>
+            <span class="micro-label">후보 조정안</span>
             <span class="board-meta">{{ planRowCount }} rows</span>
           </header>
           <PlanDelta :plan="candidatePlanDelta" :names="holdingNames" />

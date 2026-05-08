@@ -1,157 +1,112 @@
 <script setup lang="ts">
-type IntegrationStatus = "통합 완료" | "부분 통합" | "후속 과제";
+type EngineStatus = "사용 가능" | "확인 필요" | "후속 작업";
 
-type TeamIntegration = {
-  repo: string;
-  module: string;
-  status: IntegrationStatus;
-  source: string[];
-  integrated: string[];
-  liveFlow: string[];
-  proof: string;
-  meetingLine: string;
+type EngineCapability = {
+  name: string;
+  status: EngineStatus;
+  summary: string;
+  flow: string[];
+  signals: string[];
+  verification: string;
 };
 
-const integrations: TeamIntegration[] = [
+const capabilities: EngineCapability[] = [
   {
-    repo: "KW-Libra/libra-direct",
-    module: "Direct Indexing Core",
-    status: "통합 완료",
-    source: [
-      "D:\\KW-Libra-team-repos\\libra-direct\\core\\drift.py",
-      "D:\\KW-Libra-team-repos\\libra-direct\\core\\models.py",
-      "D:\\KW-Libra-team-repos\\libra-direct\\docs\\interface_contract.md",
+    name: "초기 포트폴리오 설정",
+    status: "사용 가능",
+    summary: "회원가입 후 투자 성향, 운용 금액, 목표 종목, 목표 비중을 먼저 확정합니다.",
+    flow: [
+      "사용자가 KIS 종목 검색으로 편입 후보를 찾습니다.",
+      "선택한 종목과 목표 비중을 저장합니다.",
+      "저장된 목표 비중이 Dashboard와 Judge 입력으로 이어집니다.",
     ],
-    integrated: [
-      "D:\\Libra\\src\\libra_agent\\libra\\direct_indexing.py",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\portfolio\\PortfolioDefinitionService.java",
-      "D:\\libra-backend\\src\\main\\resources\\db\\migration\\V6__portfolio_definitions.sql",
-      "D:\\libra-frontend\\src\\pages\\OnboardingPage.vue",
-    ],
-    liveFlow: [
-      "사용자가 목표 종목과 목표 비중을 저장합니다.",
-      "KIS 잔고 동기화 결과와 목표 비중을 Judge 요청에 함께 보냅니다.",
-      "Agent가 drift report와 후보 리밸런싱 weight delta를 계산합니다.",
-    ],
-    proof: "목표 비중 저장 후 Judge 실행 시 candidate_rebalance_plan이 target-current drift 기준으로 생성됩니다.",
-    meetingLine:
-      "직접 인덱싱 레포의 drift 계산 모델을 LIBRA 판단 엔진의 후보 리밸런싱 생성 단계로 흡수했습니다.",
+    signals: ["투자 성향", "초기 운용 금액", "목표 종목", "목표 비중"],
+    verification: "초기 설정에서 005930, 000660을 선택한 뒤 목표 비중 저장과 판단 실행까지 확인합니다.",
   },
   {
-    repo: "KW-Libra/JYlibra-sample_v1",
-    module: "Onboarding & Recommendation",
-    status: "부분 통합",
-    source: [
-      "D:\\KW-Libra-team-repos\\JYlibra-sample_v1\\docs\\PLAN_onboarding_index_recommendation.md",
-      "D:\\KW-Libra-team-repos\\JYlibra-sample_v1\\libra-backend\\src\\main\\java\\com\\libra\\api\\user\\recommend\\IndexRecommenderService.java",
-      "D:\\KW-Libra-team-repos\\JYlibra-sample_v1\\libra-front\\src\\components\\onboarding\\OnboardingPage.tsx",
+    name: "KIS 잔고·시세 동기화",
+    status: "확인 필요",
+    summary: "모의투자 계정의 잔고와 현재가를 받아 현재 포트폴리오 상태를 갱신합니다.",
+    flow: [
+      "Profile에서 KIS 모의투자 인증 정보를 저장합니다.",
+      "Dashboard에서 잔고 동기화와 현재가 조회를 실행합니다.",
+      "후보 리밸런싱 비중을 현재가 기준 주문 수량으로 변환합니다.",
     ],
-    integrated: [
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\recommend\\IndexRecommenderService.java",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\recommend\\RecommendController.java",
-      "D:\\libra-frontend\\src\\pages\\OnboardingPage.vue",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\integration\\kis\\KisStockMasterService.java",
-    ],
-    liveFlow: [
-      "회원가입 후 초기 설정에서 투자 성향과 시장 선호를 받습니다.",
-      "추천 모드는 지수 후보를 계산하고, 직접 구성 모드는 KIS 종목 마스터에서 종목을 검색합니다.",
-      "선택한 종목과 비중은 목표 포트폴리오로 저장되어 Dashboard와 Judge로 이어집니다.",
-    ],
-    proof: "KIS 종목 검색에서 005930 삼성전자, 000660 SK하이닉스를 선택해 목표 비중 저장까지 완료됩니다.",
-    meetingLine:
-      "온보딩과 지수 추천 아이디어는 유지하되, 현재 서비스에서는 KIS 종목 마스터 기반 직접 선택 흐름까지 확장했습니다.",
+    signals: ["보유 종목", "평가 금액", "현재가", "주문 가능 수량"],
+    verification: "KIS 응답 실패 시 화면에 모의/실전 환경과 오류 원인이 분리되어 표시되어야 합니다.",
   },
   {
-    repo: "KW-Libra/HJ-agent",
-    module: "Evaluation & Feedback Loop",
-    status: "통합 완료",
-    source: [
-      "D:\\KW-Libra-team-repos\\HJ-agent\\scripts\\evaluation_agent.py",
-      "D:\\KW-Libra-team-repos\\HJ-agent\\scripts\\orchestrator.py",
-      "D:\\KW-Libra-team-repos\\HJ-agent\\scripts\\result_adapter.py",
+    name: "Judge 판단 흐름",
+    status: "사용 가능",
+    summary: "Judge가 필요한 관점을 순서대로 호출하고, 호출·건너뜀·최종 판단을 trace로 남깁니다.",
+    flow: [
+      "공시와 뉴스로 현재 사건 신호를 확인합니다.",
+      "후보 리밸런싱이 있으면 수익성과 비용 검토를 붙입니다.",
+      "필요 시 7개 판단 관점까지 확장해 최종 결론을 만듭니다.",
     ],
-    integrated: [
-      "D:\\Libra\\src\\libra_agent\\libra_evaluation.py",
-      "D:\\Libra\\src\\libra_agent\\libra_api.py",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\decision\\DecisionRunService.java",
-      "D:\\libra-frontend\\src\\pages\\HistoryPage.vue",
-    ],
-    liveFlow: [
-      "저장된 Judge run에 대해 수익률, 비용, 사용자 피드백을 입력합니다.",
-      "Agent API의 /v1/evaluations가 방향 정확도와 비용 효율을 계산합니다.",
-      "평가 결과는 다음 Judge 요청의 prior reflection 후보로 저장됩니다.",
-    ],
-    proof: "History 화면에서 판단 평가를 저장하면 backend가 agent evaluation 결과와 reflection을 함께 보관합니다.",
-    meetingLine:
-      "HJ-agent의 사후 평가 에이전트를 현재 결정 이력과 연결해 판단 개선 루프의 근거로 만들었습니다.",
+    signals: ["호출된 관점", "건너뛴 관점", "후보 조정안", "판단 기록"],
+    verification: "판단 과정 화면에서 turn별 호출 순서와 근거 문장을 확인합니다.",
   },
   {
-    repo: "LIBRA KIS Runtime",
-    module: "Brokerage Adapter",
-    status: "부분 통합",
-    source: [
-      "KIS Open Trading API",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\integration\\kis",
+    name: "7개 판단 관점",
+    status: "사용 가능",
+    summary: "리스크, 세금, 규정, 매크로, 감성, 체결, ESG 관점이 같은 후보안을 별도로 검토합니다.",
+    flow: [
+      "각 관점이 approve, reject, abstain 중 하나의 의견을 냅니다.",
+      "Compliance는 사용자 조건 위반 시 단독 차단권을 가집니다.",
+      "합의 결과는 최종 판단의 보조 근거로 저장됩니다.",
     ],
-    integrated: [
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\integration\\kis\\KisPortfolioSyncService.java",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\integration\\kis\\KisMarketPriceService.java",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\integration\\kis\\KisAccessTokenService.java",
-      "D:\\libra-backend\\src\\main\\java\\com\\libra\\api\\decision\\DecisionExecutionProposalItem.java",
-      "D:\\libra-frontend\\src\\pages\\HistoryPage.vue",
+    signals: ["Risk", "Tax", "Compliance", "Macro", "Sentiment", "Execution", "ESG"],
+    verification: "에이전트 테스트에서 7개 관점이 모두 응답 목록과 decision trace에 포함되는지 검증합니다.",
+  },
+  {
+    name: "사후 평가와 판단 기억",
+    status: "후속 작업",
+    summary: "실행 후 결과와 사용자 피드백을 저장해 다음 판단에서 참고할 수 있게 만듭니다.",
+    flow: [
+      "History에서 과거 판단과 후보 주문을 확인합니다.",
+      "성과, 비용, 사용자 피드백을 판단 이력에 연결합니다.",
+      "다음 Judge 실행 때 prior reflection 후보로 활용합니다.",
     ],
-    liveFlow: [
-      "Profile에서 KIS 인증 정보를 저장합니다.",
-      "Dashboard에서 모의투자 잔고와 현재가를 동기화합니다.",
-      "History에서 candidate weight delta를 KIS 현재가 기반 주문 수량으로 변환합니다.",
-      "REBALANCE 판단에서 Profit/Cost 검토가 끝난 경우에만 모의투자 주문 게이트가 열립니다.",
-    ],
-    proof: "demo 계정 기준 잔고 동기화, 005930/000660 현재가 조회, 000660 1주/005930 11주 주문 제안까지 확인했습니다.",
-    meetingLine:
-      "자동매매 전체를 바로 여는 대신 KIS 현재가 기반 주문 제안과 안전 게이트가 있는 모의투자 실행 경로까지 연결했습니다.",
+    signals: ["판단 결과", "사용자 피드백", "성과 평가", "reflection"],
+    verification: "저장된 평가가 다음 판단 요청의 보조 맥락으로 들어가는지 통합 테스트가 필요합니다.",
   },
 ];
 
 const statusCounts = [
-  { label: "통합 완료", value: integrations.filter((item) => item.status === "통합 완료").length },
-  { label: "부분 통합", value: integrations.filter((item) => item.status === "부분 통합").length },
-  { label: "후속 과제", value: integrations.filter((item) => item.status === "후속 과제").length },
+  { label: "사용 가능", value: capabilities.filter((item) => item.status === "사용 가능").length },
+  { label: "확인 필요", value: capabilities.filter((item) => item.status === "확인 필요").length },
+  { label: "후속 작업", value: capabilities.filter((item) => item.status === "후속 작업").length },
 ];
 
-const proofChecklist = [
-  "회원가입 후 초기 설정에서 KIS 종목을 검색하고 목표 비중을 저장한다.",
+const demoChecklist = [
+  "초기 설정에서 KIS 종목을 검색하고 목표 비중을 저장한다.",
   "Dashboard에서 KIS 모의투자 잔고와 현재가를 동기화한다.",
-  "Judge 실행 결과에서 called agents, skipped agents, candidate plan을 확인한다.",
-  "History에서 평가를 저장해 prior reflection 루프를 확인한다.",
+  "Judge 실행 후 판단 과정에서 호출·건너뜀·후보 조정안을 확인한다.",
+  "7개 판단 관점 카드가 응답 상태와 근거를 표시하는지 확인한다.",
+  "History에서 판단 결과와 평가 저장 흐름을 확인한다.",
 ];
 
-const deferredItems = [
-  "Kafka/WebSocket 실시간 스트리밍 전체 이식",
-  "체결 조회, 정정, 취소까지 포함한 주문 라이프사이클",
-  "FinBERT, FinGPT, Gemini-Claude 적대 검토 운영화",
-  "KIS 구성종목 기반 실제 지수 샘플러",
+const remainingItems = [
+  "브라우저에서 회원가입부터 판단 저장까지 관통하는 자동 E2E",
+  "KIS 주문 체결 조회, 정정, 취소까지 포함한 주문 라이프사이클",
+  "뉴스·리포트 수집 데이터의 운영 품질 모니터링",
+  "사후 평가 결과를 다음 Judge 판단에 넣는 폐루프 검증",
 ];
-
-function shortPath(path: string) {
-  const normalized = path.replaceAll("\\", "/");
-  const parts = normalized.split("/").filter(Boolean);
-  if (parts.length <= 3) return normalized;
-  return `…/${parts.slice(-3).join("/")}`;
-}
 </script>
 
 <template>
   <article class="agents-page">
     <section class="agents-command">
       <div>
-        <span class="eyebrow">Team Integration</span>
-        <h1>팀원 레포가 실제 서비스 흐름에 들어간 위치</h1>
+        <span class="eyebrow">Agent Health</span>
+        <h1>LIBRA 판단 엔진이 지금 무엇을 검토하는지 보여줍니다.</h1>
         <p>
-          발표에서 말로만 설명하지 않도록 원본 레포, 통합된 파일, 실제 사용 흐름,
-          검증 포인트를 한 화면에 묶었습니다.
+          이 화면은 내부 구현 출처가 아니라 실제 서비스 흐름 기준으로
+          초기 설정, KIS 동기화, Judge 판단, 7개 관점 합의, 사후 평가 상태를 정리합니다.
         </p>
       </div>
-      <div class="status-strip" aria-label="팀 모듈 통합 상태 요약">
+      <div class="status-strip" aria-label="판단 엔진 상태 요약">
         <div v-for="item in statusCounts" :key="item.label" class="status-tile">
           <strong>{{ item.value }}</strong>
           <span>{{ item.label }}</span>
@@ -159,50 +114,40 @@ function shortPath(path: string) {
       </div>
     </section>
 
-    <section class="integration-grid" aria-label="팀 레포별 통합 현황">
+    <section class="integration-grid" aria-label="판단 엔진 기능 상태">
       <article
-        v-for="item in integrations"
-        :key="item.repo"
+        v-for="item in capabilities"
+        :key="item.name"
         class="integration-card"
         :data-status="item.status"
       >
         <header>
           <div>
-            <span class="repo-name">{{ item.repo }}</span>
-            <h2>{{ item.module }}</h2>
+            <span class="capability-name">{{ item.status }}</span>
+            <h2>{{ item.name }}</h2>
           </div>
           <span class="status-pill">{{ item.status }}</span>
         </header>
 
+        <p class="capability-summary">{{ item.summary }}</p>
+
         <div class="flow-block">
           <span class="block-label">실제 흐름</span>
           <ol>
-            <li v-for="step in item.liveFlow" :key="step">{{ step }}</li>
+            <li v-for="step in item.flow" :key="step">{{ step }}</li>
           </ol>
         </div>
 
-        <div class="path-columns">
-          <div>
-            <span class="block-label">원본</span>
-            <ul>
-              <li v-for="path in item.source" :key="path">
-                <code :title="path">{{ shortPath(path) }}</code>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <span class="block-label">현재 LIBRA</span>
-            <ul>
-              <li v-for="path in item.integrated" :key="path">
-                <code :title="path">{{ shortPath(path) }}</code>
-              </li>
-            </ul>
-          </div>
+        <div class="signal-list">
+          <span class="block-label">판단 입력</span>
+          <ul>
+            <li v-for="signal in item.signals" :key="signal">{{ signal }}</li>
+          </ul>
         </div>
 
         <footer>
-          <p>{{ item.proof }}</p>
-          <strong>{{ item.meetingLine }}</strong>
+          <span class="block-label">검증 포인트</span>
+          <p>{{ item.verification }}</p>
         </footer>
       </article>
     </section>
@@ -210,17 +155,17 @@ function shortPath(path: string) {
     <section class="meeting-proof">
       <div class="proof-panel">
         <span class="eyebrow">Demo Checklist</span>
-        <h2>내일 미팅에서 보여줄 순서</h2>
+        <h2>시연 순서</h2>
         <ol>
-          <li v-for="item in proofChecklist" :key="item">{{ item }}</li>
+          <li v-for="item in demoChecklist" :key="item">{{ item }}</li>
         </ol>
       </div>
 
       <div class="proof-panel">
-        <span class="eyebrow">Not Hidden</span>
-        <h2>아직 남은 범위</h2>
+        <span class="eyebrow">Open Work</span>
+        <h2>남은 검증 범위</h2>
         <ul>
-          <li v-for="item in deferredItems" :key="item">{{ item }}</li>
+          <li v-for="item in remainingItems" :key="item">{{ item }}</li>
         </ul>
       </div>
     </section>
@@ -244,7 +189,7 @@ function shortPath(path: string) {
 }
 
 .eyebrow,
-.repo-name,
+.capability-name,
 .block-label {
   display: block;
   color: var(--ink-3);
@@ -264,8 +209,9 @@ function shortPath(path: string) {
 
 .agents-command h1 {
   margin-top: 10px;
+  max-width: 920px;
   font-size: clamp(28px, 4vw, 48px);
-  line-height: 1.05;
+  line-height: 1.08;
 }
 
 .agents-command p {
@@ -313,17 +259,22 @@ function shortPath(path: string) {
 .integration-card {
   display: grid;
   gap: 18px;
+  min-width: 0;
   padding: 22px;
   border: 1px solid var(--line);
   background: var(--paper-2);
 }
 
-.integration-card[data-status="통합 완료"] {
+.integration-card[data-status="사용 가능"] {
   border-top: 4px solid var(--pos);
 }
 
-.integration-card[data-status="부분 통합"] {
+.integration-card[data-status="확인 필요"] {
   border-top: 4px solid var(--warn);
+}
+
+.integration-card[data-status="후속 작업"] {
+  border-top: 4px solid var(--ink-3);
 }
 
 .integration-card header {
@@ -348,8 +299,17 @@ function shortPath(path: string) {
   font-weight: 800;
 }
 
+.capability-summary {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
 .flow-block,
-.proof-panel {
+.proof-panel,
+.signal-list,
+.integration-card footer {
   padding-top: 18px;
   border-top: 1px solid var(--line);
 }
@@ -363,47 +323,33 @@ function shortPath(path: string) {
   line-height: 1.65;
 }
 
-.path-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.path-columns ul {
-  display: grid;
+.signal-list ul {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
 }
 
-.path-columns code {
-  display: block;
-  overflow-wrap: anywhere;
-  padding: 9px 10px;
+.signal-list li {
+  padding: 8px 10px;
   border: 1px solid var(--line);
   background: var(--paper-3);
   color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .integration-card footer {
   display: grid;
   gap: 10px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
 }
 
-.integration-card footer p,
-.integration-card footer strong {
+.integration-card footer p {
   margin: 0;
   color: var(--ink-2);
   line-height: 1.6;
-}
-
-.integration-card footer strong {
-  color: var(--ink);
 }
 
 .meeting-proof {
@@ -438,8 +384,7 @@ function shortPath(path: string) {
     padding: 18px;
   }
 
-  .status-strip,
-  .path-columns {
+  .status-strip {
     grid-template-columns: 1fr;
   }
 }

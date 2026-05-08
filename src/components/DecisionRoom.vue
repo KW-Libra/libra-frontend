@@ -29,7 +29,7 @@ function signalSize(agent: AgentView) {
   <section id="decision" class="decision-room">
     <section class="hero-panel">
       <div class="hero-copy">
-        <span>Judge-first Decision Room</span>
+        <span>Judge 우선 판단</span>
         <h1>Judge가 먼저 판단하고 필요한 에이전트만 호출합니다.</h1>
         <p>{{ decisionBadge.message }}</p>
       </div>
@@ -42,7 +42,7 @@ function signalSize(agent: AgentView) {
 
     <section class="route-panel" aria-label="동적 호출 경로">
       <div class="route-copy">
-        <span>Orchestration Route</span>
+        <span>호출 경로</span>
         <strong>이번 판단에서 실제로 열린 경로</strong>
       </div>
       <ol class="route-line">
@@ -71,7 +71,7 @@ function signalSize(agent: AgentView) {
         <div class="section-title">
           <span class="title-glyph">S</span>
           <div>
-            <span>Signal Space</span>
+            <span>신호 분포</span>
             <h2>의견 방향과 신뢰도</h2>
           </div>
         </div>
@@ -103,7 +103,7 @@ function signalSize(agent: AgentView) {
         <div class="section-title">
           <span class="title-glyph">?</span>
           <div>
-            <span>Why Skipped</span>
+            <span>건너뛴 이유</span>
             <h2>미호출 이유</h2>
           </div>
         </div>

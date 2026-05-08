@@ -377,19 +377,19 @@ onMounted(loadRuns);
         <!-- Selected run banner -->
         <section class="board-verdict" :data-tone="decisionTone">
           <div class="verdict-copy">
-            <span class="verdict-eyebrow">Run · {{ shortId(detail.summary.id) }}</span>
+            <span class="verdict-eyebrow">실행 · {{ shortId(detail.summary.id) }}</span>
             <h3>{{ decisionLabel(detail.summary.decision) }}</h3>
             <p>"{{ detail.summary.query }}"</p>
           </div>
           <div class="verdict-meta">
             <span class="verdict-conf">
-              confidence
+              신뢰도
               <strong>{{ formatRatio(detail.summary.confidence, 0) }}</strong>
             </span>
             <span class="verdict-when">
-              {{ calledAgents.length }} agents · {{ planRows.length }} plan rows
+              {{ calledAgents.length }}개 관점 · {{ planRows.length }}개 조정안
             </span>
-            <RouterLink class="verdict-cta" to="/decision">Open trace →</RouterLink>
+            <RouterLink class="verdict-cta" to="/decision">판단 과정 →</RouterLink>
           </div>
         </section>
 
@@ -397,9 +397,9 @@ onMounted(loadRuns);
         <section class="board-pair">
           <article class="pair-block">
             <header>
-              <span class="block-eyebrow">After-action</span>
+              <span class="block-eyebrow">사후 평가</span>
               <span class="block-meta">
-                {{ latestEvaluation?.verdict ?? "Not reviewed" }}
+                {{ latestEvaluation?.verdict ?? "미평가" }}
               </span>
             </header>
             <p class="block-body">

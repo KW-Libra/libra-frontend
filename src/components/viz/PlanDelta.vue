@@ -45,13 +45,13 @@ function deltaLabel(delta: number) {
 </script>
 
 <template>
-  <figure class="plan-figure" aria-label="Candidate rebalance plan">
+  <figure class="plan-figure" aria-label="후보 리밸런싱 조정안">
     <figcaption>
-      <span class="plan-eyebrow">Candidate plan · {{ rows.length }} rows</span>
+      <span class="plan-eyebrow">후보 조정안 · {{ rows.length }}건</span>
       <span class="plan-meta">
-        <span class="plan-meta-buy">{{ buyCount }} buy</span>
+        <span class="plan-meta-buy">매수 {{ buyCount }}</span>
         <span class="plan-meta-sep">·</span>
-        <span class="plan-meta-sell">{{ sellCount }} sell</span>
+        <span class="plan-meta-sell">매도 {{ sellCount }}</span>
       </span>
     </figcaption>
 
