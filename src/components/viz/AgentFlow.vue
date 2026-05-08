@@ -53,15 +53,15 @@ const dim = computed(() => {
     };
   }
   return {
-    ROW_GAP: 56,
-    NODE_R: 16,
+    ROW_GAP: 38,
+    NODE_R: 13,
     NAME_X: 110,
-    JUDGE_W:116,
-    JUDGE_H: 64,
-    VERDICT_X: 776,
-    VERDICT_W: 168,
-    VERDICT_H: 44,
-    TOP_PAD: 64,
+    JUDGE_W:108,
+    JUDGE_H: 56,
+    VERDICT_X: 762,
+    VERDICT_W: 150,
+    VERDICT_H: 38,
+    TOP_PAD: 44,
   };
 });
 
@@ -102,30 +102,11 @@ const calledRows = computed<Row[]>(() => {
   }));
 });
 
-const skippedRows = computed<Row[]>(() => {
-  // In compact mode, skipped agents are rendered as a small text pill
-  // outside the SVG, not as additional lanes.
-  if (props.compact) return [];
-  const calledHeight = calledRows.value.length * dim.value.ROW_GAP;
-  const skippedStart = dim.value.TOP_PAD + calledHeight + 24;
-  return props.agents
-    .filter((a) => a.status === "skipped")
-    .map((agent, idx) => ({
-      agent,
-      status: "skipped" as const,
-      turnNum: 0,
-      y: skippedStart + idx * (dim.value.ROW_GAP - 12),
-      signalColor: "var(--ink-3)",
-      edgeLength: 0,
-      drawIdx: idx,
-    }));
-});
-
 const skippedAgentList = computed(() =>
   props.agents.filter((a) => a.status === "skipped"),
 );
 
-const allRows = computed(() => [...calledRows.value, ...skippedRows.value]);
+const allRows = computed(() => calledRows.value);
 
 const judgeY = computed(() => {
   if (!calledRows.value.length) return 100;
@@ -137,11 +118,9 @@ const judgeY = computed(() => {
 const verdictY = computed(() => judgeY.value);
 
 const totalH = computed(() => {
-  const last =
-    skippedRows.value[skippedRows.value.length - 1] ??
-    calledRows.value[calledRows.value.length - 1];
-  const minH = props.compact ? 180 : 280;
-  return Math.max(minH, (last?.y ?? 100) + (props.compact ? 32 : 56));
+  const last = calledRows.value[calledRows.value.length - 1];
+  const minH = props.compact ? 166 : 220;
+  return Math.max(minH, (last?.y ?? 100) + (props.compact ? 32 : 44));
 });
 
 const verdictFill = computed(() => {
@@ -221,7 +200,7 @@ const statusBadge = computed(() => {
           <span>{{ calledRows.length }} consulted</span>
           <span class="funnel-meta-sep">·</span>
           <span class="funnel-meta-skip">
-            {{ compact ? skippedAgentList.length : skippedRows.length }} skipped
+            {{ skippedAgentList.length }} skipped
           </span>
         </span>
       </div>
@@ -288,7 +267,6 @@ const statusBadge = computed(() => {
 
       <!-- Agent rows -->
       <g v-for="row in allRows" :key="`row-${row.agent.id}`" class="funnel-row">
-        <!-- Mini-glyph -->
         <rect
           class="funnel-glyph"
           :x="NODE_X - dim.NODE_R"
@@ -335,17 +313,6 @@ const statusBadge = computed(() => {
           :fill="isActive(row) ? 'var(--ink)' : 'var(--ink-3)'"
         >
           T{{ row.turnNum }}
-        </text>
-        <text
-          v-else
-          :x="TURN_LABEL_X"
-          :y="row.y + 4"
-          font-family="JetBrains Mono, monospace"
-          font-size="10"
-          letter-spacing="0.08em"
-          fill="var(--ink-3)"
-        >
-          SKIP
         </text>
       </g>
 
@@ -433,9 +400,8 @@ const statusBadge = computed(() => {
       </g>
     </svg>
 
-    <!-- In compact mode, surface skipped agents as a slim pill row instead of a SVG lane -->
     <div
-      v-if="compact && skippedAgentList.length"
+      v-if="skippedAgentList.length"
       class="funnel-skipped-row"
       aria-label="Skipped agents"
     >
@@ -553,10 +519,13 @@ const statusBadge = computed(() => {
 }
 .funnel-svg {
   display: block;
-  height: auto;
+  height: clamp(184px, 18vw, 250px);
   max-width: 100%;
   overflow: visible;
   width: 100%;
+}
+.funnel-figure[data-compact] .funnel-svg {
+  height: clamp(158px, 16vw, 210px);
 }
 
 /* ── Edge draw-in animation: stroke-dashoffset trick ─────── */

@@ -285,6 +285,23 @@ onMounted(ensureLoaded);
       </div>
     </section>
 
+    <!-- ── TURN STRIP ────────────────────────────────────────── -->
+    <section v-if="allTurns.length > 1" class="trace-turns">
+      <span class="block-eyebrow">Turn 선택</span>
+      <div class="turn-row">
+        <button
+          v-for="turn in allTurns"
+          :key="turn"
+          type="button"
+          class="turn-pill"
+          :data-active="turn === currentTurn"
+          @click="setCurrentTurn(turn)"
+        >
+          {{ String(turn).padStart(2, "0") }}
+        </button>
+      </div>
+    </section>
+
     <!-- ── ORCHESTRATION (turn-aware) ───────────────────────── -->
     <AgentFlow
       :agents="agents"
@@ -294,6 +311,40 @@ onMounted(ensureLoaded);
       :judge-state="judgeState"
       :run-key="runKey"
     />
+
+    <!-- ── SELECTED TURN: TRACE ENTRIES + PLAN ──────────────── -->
+    <section class="board-pair viz-pair">
+      <article class="trace-detail">
+        <header>
+          <span class="block-eyebrow">Turn {{ currentTurn }} · trace</span>
+          <span class="block-meta">{{ selectedTrace.length }} entries</span>
+        </header>
+        <ol v-if="selectedTrace.length" class="trace-entries">
+          <li
+            v-for="(entry, idx) in selectedTrace"
+            :key="`${entry.turn_number}-${idx}-${entry.actor}`"
+            :data-phase="entry.phase"
+          >
+            <span class="trace-seq">{{ String(idx + 1).padStart(2, "0") }}</span>
+            <div class="trace-body">
+              <header>
+                <strong>{{ entry.actor }}</strong>
+                <span class="trace-phase">{{ phaseLabel(entry.phase) }}</span>
+              </header>
+              <p class="trace-summary">
+                {{ entry.summary || entry.note || entry.query || "—" }}
+              </p>
+              <p v-if="entry.context" class="trace-context">{{ entry.context }}</p>
+            </div>
+          </li>
+        </ol>
+        <p v-else class="trace-empty">
+          선택된 turn에 trace 항목이 없습니다.
+        </p>
+      </article>
+
+      <PlanDelta :plan="candidatePlanDelta" :names="holdingNames" />
+    </section>
 
     <!-- ── DOMAIN AGENTS ────────────────────────────────────── -->
     <section class="domain-agents">
@@ -333,57 +384,6 @@ onMounted(ensureLoaded);
           </details>
         </article>
       </div>
-    </section>
-
-    <!-- ── TURN STRIP ────────────────────────────────────────── -->
-    <section v-if="allTurns.length > 1" class="trace-turns">
-      <span class="block-eyebrow">Turn 선택</span>
-      <div class="turn-row">
-        <button
-          v-for="turn in allTurns"
-          :key="turn"
-          type="button"
-          class="turn-pill"
-          :data-active="turn === currentTurn"
-          @click="setCurrentTurn(turn)"
-        >
-          {{ String(turn).padStart(2, "0") }}
-        </button>
-      </div>
-    </section>
-
-    <!-- ── SELECTED TURN: TRACE ENTRIES + PLAN ──────────────── -->
-    <section class="board-pair viz-pair">
-      <article class="trace-detail">
-        <header>
-          <span class="block-eyebrow">Turn {{ currentTurn }} · trace</span>
-          <span class="block-meta">{{ selectedTrace.length }} entries</span>
-        </header>
-        <ol v-if="selectedTrace.length" class="trace-entries">
-          <li
-            v-for="(entry, idx) in selectedTrace"
-            :key="`${entry.turn_number}-${idx}-${entry.actor}`"
-            :data-phase="entry.phase"
-          >
-            <span class="trace-seq">{{ String(idx + 1).padStart(2, "0") }}</span>
-            <div class="trace-body">
-              <header>
-                <strong>{{ entry.actor }}</strong>
-                <span class="trace-phase">{{ phaseLabel(entry.phase) }}</span>
-              </header>
-              <p class="trace-summary">
-                {{ entry.summary || entry.note || entry.query || "—" }}
-              </p>
-              <p v-if="entry.context" class="trace-context">{{ entry.context }}</p>
-            </div>
-          </li>
-        </ol>
-        <p v-else class="trace-empty">
-          선택된 turn에 trace 항목이 없습니다.
-        </p>
-      </article>
-
-      <PlanDelta :plan="candidatePlanDelta" :names="holdingNames" />
     </section>
 
     <!-- ── TIMELINE ──────────────────────────────────────────── -->
