@@ -80,6 +80,77 @@ const selectedTrace = computed(() => {
   return trace.filter((entry) => entry.turn_number === currentTurn.value);
 });
 
+const governanceV1 = computed(() => latestRun.value?.governance_v1 ?? null);
+const runtimeEngine = computed(() => latestRun.value?.runtime?.engine ?? "demo");
+const isV1Primary = computed(() => runtimeEngine.value === "governance_v1_committee");
+const complianceBefore = computed(() => governanceV1.value?.compliance_before ?? null);
+const complianceAfter = computed(() => governanceV1.value?.compliance_after ?? null);
+const blockingViolations = computed(() =>
+  [...(complianceBefore.value?.violations ?? []), ...(complianceAfter.value?.violations ?? [])]
+    .filter((item) => item.severity === "BLOCKING"),
+);
+
+const governanceStages = computed(() => {
+  const g = governanceV1.value;
+  if (!g) return [];
+  return [
+    {
+      key: "before",
+      label: "Compliance BEFORE",
+      value: complianceStateLabel(g.compliance_before),
+      detail: violationSummary(g.compliance_before),
+      tone: g.compliance_before.can_proceed ? "ok" : "block",
+    },
+    {
+      key: "round1",
+      label: "Round 1 Committee",
+      value: `${g.round1_opinions.length} agents`,
+      detail: "Core 5 + Domain 6 독립 발화",
+      tone: "run",
+    },
+    {
+      key: "mediator",
+      label: "Mediator Judge",
+      value: g.mediator_decision?.skip_round_2 ? "skip R2" : `${g.targets_to_recall.length} recalled`,
+      detail: g.mediator_decision?.rationale ?? "Mediator 기록 없음",
+      tone: g.mediator_decision?.skip_round_2 ? "ok" : "warn",
+    },
+    {
+      key: "round2",
+      label: "Round 2 Recall",
+      value: `${g.round2_opinions.length} agents`,
+      detail: g.round2_opinions.length
+        ? g.round2_opinions.map((opinion) => opinion.agent).join(", ")
+        : "충돌 표적 재호출 없음",
+      tone: g.round2_opinions.length ? "warn" : "ok",
+    },
+    {
+      key: "after",
+      label: "Compliance AFTER",
+      value: complianceStateLabel(g.compliance_after),
+      detail: violationSummary(g.compliance_after),
+      tone: g.compliance_after.can_proceed ? "ok" : "block",
+    },
+    {
+      key: "final",
+      label: "Final Judge",
+      value: g.final_decision.branch,
+      detail: g.final_decision.reasoning,
+      tone: g.final_decision.branch === "COMPLIANCE_VETO" ? "block" : "run",
+    },
+  ];
+});
+
+const round1OpinionCards = computed(() =>
+  (governanceV1.value?.round1_opinions ?? []).map((opinion) => ({
+    agent: opinion.agent,
+    vote: opinionVoteSummary(opinion),
+    confidence: maxOpinionConfidence(opinion),
+    informational: opinion.votes.every((vote) => vote.informational),
+    reasoning: opinion.reasoning || opinion.silence_reason || "발화 기록이 없습니다.",
+  })),
+);
+
 const candidatePlan = computed(
   () => latestRun.value?.decision?.candidate_rebalance_plan ?? {},
 );
@@ -101,7 +172,6 @@ type DomainAgentCard = {
 const domainAgentMeta = [
   { key: "risk", label: "Risk", codename: "Vora" },
   { key: "tax", label: "Tax", codename: "Reed" },
-  { key: "compliance", label: "Compliance", codename: "Clarke" },
   { key: "macro", label: "Macro", codename: "Halden" },
   { key: "sentiment", label: "Sentiment", codename: "Imo" },
   { key: "execution", label: "Execution", codename: "Tien" },
@@ -131,10 +201,7 @@ const hasDomainResponses = computed(() =>
   domainAgentCards.value.some((card) => card.response),
 );
 
-const complianceReject = computed(() => {
-  const compliance = domainAgentCards.value.find((card) => card.key === "compliance");
-  return compliance?.vote === "reject";
-});
+const complianceReject = computed(() => blockingViolations.value.length > 0);
 
 const holdingNames = computed(() => {
   const map: Record<string, string> = {};
@@ -170,6 +237,30 @@ const phaseLabel = (phase: string) => {
   };
   return map[phase] ?? phase;
 };
+
+function complianceStateLabel(check: { can_proceed: boolean; violations: unknown[] } | null) {
+  if (!check) return "—";
+  if (!check.can_proceed) return "BLOCKING";
+  return check.violations.length ? "WARNING" : "PASS";
+}
+
+function violationSummary(check: { violations: Array<{ rule_id: string; description: string }> } | null) {
+  if (!check) return "검증 기록 없음";
+  if (!check.violations.length) return "위반 없음";
+  return check.violations.map((item) => `${item.rule_id}: ${item.description}`).join(" · ");
+}
+
+function opinionVoteSummary(opinion: { votes: Array<{ direction: string; subject: string; magnitude_pct: number; informational: boolean }> }) {
+  if (!opinion.votes.length) return "SILENT";
+  const first = opinion.votes[0];
+  const suffix = opinion.votes.length > 1 ? ` +${opinion.votes.length - 1}` : "";
+  const direction = first.informational ? "INFO" : first.direction;
+  return `${direction} ${first.subject} ${first.magnitude_pct > 0 ? "+" : ""}${first.magnitude_pct.toFixed(1)}%${suffix}`;
+}
+
+function maxOpinionConfidence(opinion: { votes: Array<{ confidence: number }> }) {
+  return Math.max(0, ...opinion.votes.map((vote) => Number(vote.confidence) || 0));
+}
 
 function isDomainAgentResponse(response: AgentResponse, key: string) {
   const id = response.agent_id.toLowerCase().replace(/[\s_-]/g, "");
@@ -239,8 +330,8 @@ onMounted(ensureLoaded);
 <template>
   <article class="board">
     <section v-if="complianceReject" class="compliance-banner">
-      <strong>Compliance 거부 → 사용자 결정 필요</strong>
-      <span>Clarke가 사용자 IPS 또는 제외 룰 위반 가능성을 감지했습니다.</span>
+      <strong>Compliance Rule Engine 차단 -> 사용자 결정 필요</strong>
+      <span>{{ blockingViolations[0]?.description ?? "사용자 정책 또는 실행 안전 조건을 통과하지 못했습니다." }}</span>
     </section>
 
     <!-- ── HERO ─────────────────────────────────────────────── -->
@@ -290,6 +381,67 @@ onMounted(ensureLoaded);
           {{ portfolioBusy ? "Sync 중" : "KIS 재동기화" }}
         </button>
         <RouterLink class="hero-link" to="/dashboard">Dashboard로 →</RouterLink>
+      </div>
+    </section>
+
+    <!-- ── GOVERNANCE v1 ───────────────────────────────────── -->
+    <section v-if="governanceV1" class="governance-panel">
+      <header class="governance-head">
+        <div>
+          <span class="block-eyebrow">Governance v1</span>
+          <h3>동적 심의 흐름</h3>
+        </div>
+        <div class="governance-meta">
+          <span class="engine-pill" :data-primary="isV1Primary">
+            {{ isV1Primary ? "PRIMARY" : "LEGACY" }}
+          </span>
+          <span>{{ runtimeEngine }}</span>
+        </div>
+      </header>
+
+      <div class="governance-stage-grid">
+        <article
+          v-for="stage in governanceStages"
+          :key="stage.key"
+          class="governance-stage"
+          :data-tone="stage.tone"
+        >
+          <span>{{ stage.label }}</span>
+          <strong>{{ stage.value }}</strong>
+          <p :title="stage.detail">{{ stage.detail }}</p>
+        </article>
+      </div>
+
+      <div class="committee-strip">
+        <header>
+          <span class="block-eyebrow">Round 1 agent opinions</span>
+          <span class="block-meta">{{ round1OpinionCards.length }} agents</span>
+        </header>
+        <div class="committee-grid">
+          <article
+            v-for="card in round1OpinionCards"
+            :key="card.agent"
+            class="committee-chip"
+            :data-info="card.informational"
+          >
+            <div>
+              <strong>{{ card.agent }}</strong>
+              <span>{{ card.vote }}</span>
+            </div>
+            <small>{{ Math.round(card.confidence * 100) }}%</small>
+            <p :title="card.reasoning">{{ card.reasoning }}</p>
+          </article>
+        </div>
+      </div>
+
+      <div v-if="blockingViolations.length" class="violation-list">
+        <span class="block-eyebrow">Blocking violations</span>
+        <ul>
+          <li v-for="violation in blockingViolations" :key="`${violation.rule_id}-${violation.description}`">
+            <strong>{{ violation.rule_id }}</strong>
+            <span>{{ violation.description }}</span>
+          </li>
+        </ul>
       </div>
     </section>
 
@@ -575,6 +727,208 @@ onMounted(ensureLoaded);
   color: var(--paper);
 }
 
+.governance-panel {
+  border: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 24px;
+}
+.governance-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+.governance-head h3 {
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 4px 0 0;
+}
+.governance-meta {
+  align-items: center;
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  gap: 8px;
+  justify-content: flex-end;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.engine-pill {
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-2);
+  padding: 4px 8px;
+}
+.engine-pill[data-primary="true"] {
+  border-color: var(--seal);
+  color: var(--seal);
+}
+.governance-stage-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.governance-stage {
+  border: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 138px;
+  min-width: 0;
+  padding: 14px;
+}
+.governance-stage[data-tone="ok"] { border-top-color: var(--pos); }
+.governance-stage[data-tone="run"] { border-top-color: var(--seal); }
+.governance-stage[data-tone="warn"] { border-top-color: var(--warn); }
+.governance-stage[data-tone="block"] { border-top-color: var(--neg); }
+.governance-stage span {
+  color: var(--ink-3);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.governance-stage strong {
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+.governance-stage p {
+  color: var(--ink-2);
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.committee-strip {
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+}
+.committee-strip > header {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+.committee-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.committee-chip {
+  border: 1px solid var(--rule);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 12px;
+}
+.committee-chip[data-info="true"] {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+.committee-chip strong {
+  color: var(--ink);
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.committee-chip span,
+.committee-chip small {
+  color: var(--ink-3);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.committee-chip p {
+  color: var(--ink-2);
+  display: -webkit-box;
+  font-size: 11px;
+  grid-column: 1 / -1;
+  line-height: 1.45;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.violation-list {
+  border: 1px solid var(--neg);
+  border-left-width: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.violation-list ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.violation-list li {
+  color: var(--ink-2);
+  display: flex;
+  gap: 10px;
+}
+.violation-list strong {
+  color: var(--neg);
+  flex: 0 0 auto;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+.violation-list span {
+  font-size: 12px;
+  line-height: 1.45;
+}
+@media (max-width: 1280px) {
+  .governance-stage-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .committee-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 860px) {
+  .governance-head,
+  .committee-strip > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .governance-meta {
+    justify-content: flex-start;
+  }
+  .governance-stage-grid,
+  .committee-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .governance-panel {
+    padding: 18px;
+  }
+  .governance-stage-grid,
+  .committee-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .domain-agents {
   border-top: 1px solid var(--rule);
   display: flex;
@@ -591,7 +945,7 @@ onMounted(ensureLoaded);
 .domain-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 @media (max-width: 1280px) {
   .domain-grid {

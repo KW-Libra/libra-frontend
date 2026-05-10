@@ -140,6 +140,79 @@ export type AgentResponse = {
   focus_tickers: string[];
 };
 
+export type GovernanceVote = {
+  subject: string;
+  direction: "INCREASE" | "HOLD" | "DECREASE" | string;
+  magnitude_pct: number;
+  confidence: number;
+  concerns: string[];
+  informational: boolean;
+};
+
+export type GovernanceAgentOpinion = {
+  agent: string;
+  round: 1 | 2 | number;
+  votes: GovernanceVote[];
+  silence_reason?: string | null;
+  reasoning: string;
+  evidence_refs?: string[];
+  metadata?: Record<string, unknown>;
+  previous_round_summary?: string | null;
+  exposed_signals?: string[];
+  delta_from_round1?: "UNCHANGED" | "STRENGTHENED" | "WEAKENED" | "REVERSED" | string | null;
+  delta_rationale?: string | null;
+};
+
+export type GovernanceConsensusScore = {
+  subject: string;
+  weighted_score: number;
+  confidence_sum: number;
+  vote_distribution: Record<string, number>;
+  branch: string;
+};
+
+export type GovernanceViolation = {
+  rule_id: string;
+  severity: "WARNING" | "BLOCKING" | string;
+  description: string;
+  affected_subjects: string[];
+};
+
+export type GovernanceComplianceCheck = {
+  can_proceed: boolean;
+  violations: GovernanceViolation[];
+  state: "BEFORE" | "AFTER" | string;
+};
+
+export type GovernanceMediatorDecision = {
+  consensus_per_subject: Record<string, GovernanceConsensusScore>;
+  targets_to_recall: string[];
+  skip_round_2: boolean;
+  rationale: string;
+};
+
+export type GovernanceFinalDecision = {
+  decision: "HOLD" | "DEFER" | "USER_DECISION_REQUIRED" | "REBALANCE" | string;
+  branch: string;
+  trades: Array<{ subject: string; delta_pct: number; rationale: string }>;
+  compliance_check: GovernanceComplianceCheck;
+  reasoning: string;
+  user_question?: string | null;
+  user_options?: Array<{ label: string; supporting_agents: string[]; expected_effect: string }> | null;
+};
+
+export type GovernanceV1 = {
+  round1_opinions: GovernanceAgentOpinion[];
+  round2_opinions: GovernanceAgentOpinion[];
+  consensus_per_subject: Record<string, GovernanceConsensusScore>;
+  targets_to_recall: string[];
+  mediator_decision?: GovernanceMediatorDecision;
+  compliance_before: GovernanceComplianceCheck;
+  compliance_after: GovernanceComplianceCheck;
+  tentative_trades?: Array<{ subject: string; delta_pct: number; rationale: string }>;
+  final_decision: GovernanceFinalDecision;
+};
+
 export type DecisionTraceNode = {
   turn_number: number;
   phase:
@@ -183,12 +256,15 @@ export type JudgeRunResult = {
   agent_responses: AgentResponse[];
   decision: JudgeDecision;
   knowledge_sources: Record<string, string>;
+  governance_v1?: GovernanceV1;
   runtime: {
     engine: string;
-    thread_id: string;
+    thread_id?: string | null;
     checkpoint_path?: string | null;
     interrupted: boolean;
     resume_required: boolean;
+    round1_agent_count?: number;
+    round2_agent_count?: number;
   };
 };
 
@@ -420,11 +496,12 @@ export function searchKisStocks(
 export function runJudgeRun(): Promise<JudgeRunResult> {
   return request<JudgeRunResult>("/api/v1/judge-runs", {
     method: "POST",
-    timeoutMs: 120000,
+    timeoutMs: 180000,
     body: JSON.stringify({
       query: "현재 보유 포트폴리오를 점검하고 필요한 하위 에이전트를 동적으로 호출해 주세요.",
       depth: "medium",
       trigger: "pull",
+      governance_v1: { execution_mode: "primary" },
     }),
   });
 }
