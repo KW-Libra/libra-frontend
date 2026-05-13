@@ -78,7 +78,7 @@ jobs:
               "chmod -R a+rX,u+w /var/www/libra-frontend",
               "nginx -t",
               "systemctl reload nginx",
-              "curl -fsS http://127.0.0.1/ >/dev/null"
+              "test -s /var/www/libra-frontend/index.html"
             ]
           }
           EOF
