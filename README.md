@@ -55,7 +55,7 @@ src/
 │   └── sse.ts             # fetchEventSource wrapper (start/resume run)
 ├── types/
 │   ├── api.ts             # AuthResponse, UserProfile, ProblemDetail
-│   └── events.ts          # SSE RunEvent union (다음 단계에서 §2 매핑)
+│   └── events.ts          # SSE RunEvent contract v0
 └── pages/
     ├── LoginPage.vue
     ├── SignupPage.vue
@@ -63,9 +63,12 @@ src/
 ```
 
 ## 다음 작업
-- 디자인 시스템 — Pretendard 폰트, 색 토큰, 카드/배지 컴포넌트
-- 의사결정 트리거 페이지 — trigger 종류 + portfolio 입력 → SSE 시작
-- 트랜스크립트 시각화 — 12 발언 카드 + Mediator/Final Judge
-- 합의 매트릭스 — vote_distribution 시각화
-- HITL 다이얼로그 — `interrupt_required` 수신 시 3옵션 선택 → `/runs/{id}/resume`
-- 보고서 페이지 (`design_intuition_v1.md` §6 — 4차원 메트릭)
+- RunEvent contract v0 기준으로 얇은 스트림 상태 스토어 추가
+- 디자인/제품 결정 후 의사결정 트리거 페이지와 HITL 다이얼로그 구현
+- 제품 결정 후 트랜스크립트/합의 매트릭스/보고서 화면 구현
+
+## 이벤트 계약
+
+- 로컬 타입: `src/types/events.ts`
+- 문서: `docs/run-events.md`
+- agent 기준 문서: `libra-agent/docs/run-events.md`

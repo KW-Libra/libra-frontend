@@ -24,6 +24,7 @@ export interface RunStartBody {
   portfolio?: Record<string, unknown>
   trigger?: 'pull' | 'push' | 'user_request'
   thread_id?: string
+  approval_required?: boolean
 }
 
 export interface ResumeBody {
