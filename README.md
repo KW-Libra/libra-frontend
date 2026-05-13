@@ -49,6 +49,7 @@ src/
 ├── styles.css             # Tailwind directives
 ├── router/index.ts        # 라우트 + beforeEach 인증 가드
 ├── stores/auth.ts         # Pinia — token, user, login, signup, logout
+├── stores/runStream.ts    # Pinia — RunEvent stream state, interrupt/resume state
 ├── api/
 │   ├── client.ts          # axios + 인터셉터 2개
 │   ├── auth.ts            # signup / login / me
@@ -63,7 +64,6 @@ src/
 ```
 
 ## 다음 작업
-- RunEvent contract v0 기준으로 얇은 스트림 상태 스토어 추가
 - 디자인/제품 결정 후 의사결정 트리거 페이지와 HITL 다이얼로그 구현
 - 제품 결정 후 트랜스크립트/합의 매트릭스/보고서 화면 구현
 
