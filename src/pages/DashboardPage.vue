@@ -257,7 +257,6 @@ function toneClass(value: DecimalValue | undefined) {
 
 function statusPillClass(statusValue: KisOrderAudit['status']) {
   if (statusValue === 'SUBMITTED') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  if (statusValue === 'DRY_RUN') return 'border-sky-200 bg-sky-50 text-sky-700'
   if (statusValue === 'REJECTED') return 'border-amber-200 bg-amber-50 text-amber-700'
   if (statusValue === 'FAILED') return 'border-red-200 bg-red-50 text-red-700'
   return 'border-gray-200 bg-gray-50 text-gray-700'
@@ -320,7 +319,7 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
             <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.accountConfigured) }}</p>
           </div>
           <div>
-            <p class="text-xs text-gray-500">실주문</p>
+            <p class="text-xs text-gray-500">주문전송</p>
             <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.tradingEnabled) }}</p>
           </div>
           <div>

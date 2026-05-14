@@ -112,7 +112,7 @@ export interface PortfolioSnapshotDetail extends PortfolioSnapshot {
   snapshotJson: string
 }
 
-export type KisOrderAuditStatus = 'REQUESTED' | 'DRY_RUN' | 'SUBMITTED' | 'REJECTED' | 'FAILED'
+export type KisOrderAuditStatus = 'REQUESTED' | 'SUBMITTED' | 'REJECTED' | 'FAILED'
 export type KisOrderSide = 'BUY' | 'SELL'
 
 export interface KisOrderAudit {
@@ -127,7 +127,6 @@ export interface KisOrderAudit {
   price: DecimalValue
   orderDivision: string
   exchangeId: string
-  dryRun: boolean
   tradingEnabled: boolean
   brokerOrderNo: string | null
   brokerMessage: string | null
