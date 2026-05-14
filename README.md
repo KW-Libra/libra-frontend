@@ -18,7 +18,7 @@ Libra Vue 3 + TypeScript SPA — 멀티에이전트 의사결정 거버넌스 UI
 - **Axios 인터셉터 2개**:
     1. *요청*: `X-Trace-Id` 발급 (UUID) + `Authorization: Bearer <token>` 자동
     2. *응답*: 401 → 토큰 비우고 `/login` 리다이렉트
-- **디자인은 다음 단계** — Tailwind 만 깔고 페이지는 최소 텍스트. `design_intuition_v1.md` §7 시나리오 기반 UX 는 별도 작업.
+- **운영 콘솔 우선** — 디자인 확정 전까지는 KIS 상태, portfolio snapshot, 주문 audit 같은 backend-owned 도메인 상태를 먼저 확인한다.
 
 ## Run
 
@@ -32,13 +32,21 @@ npm run dev
 
 backend 가 8080 에 떠 있어야 로그인 가능. agent 가 8000 에 떠 있어야 (다음 단계) 의사결정 트리거 가능.
 
+운영 backend 로 로컬 확인할 때는 CORS 대신 Vite proxy 를 사용한다.
+
+```powershell
+$env:VITE_API_BASE_URL=""
+$env:VITE_PROXY_API_TARGET="https://3-34-80-58.nip.io"
+npm run dev
+```
+
 ## 페이지 (현재 골격)
 
 | Path | 인증 | 비고 |
 |---|---|---|
 | `/login` | public | 이메일/비번 → JWT. demo 계정 (`demo@libra.local` / `demo1234`) prefill |
 | `/signup` | public | 회원가입 (8자+ 비번) |
-| `/dashboard` | required | 로그인 사용자 정보 + 다음 단계 안내 |
+| `/dashboard` | required | KIS 상태, 시세 조회, portfolio snapshot, 주문 audit |
 
 ## 폴더 구조
 
@@ -53,6 +61,7 @@ src/
 ├── api/
 │   ├── client.ts          # axios + 인터셉터 2개
 │   ├── auth.ts            # signup / login / me
+│   ├── broker.ts          # KIS market/account/order audit + portfolio snapshot
 │   └── sse.ts             # fetchEventSource wrapper (start/resume run)
 ├── types/
 │   ├── api.ts             # AuthResponse, UserProfile, ProblemDetail
@@ -64,6 +73,7 @@ src/
 ```
 
 ## 다음 작업
+- KIS 키 설정 후 실제 잔고/시세 데이터 화면 검증
 - 디자인/제품 결정 후 의사결정 트리거 페이지와 HITL 다이얼로그 구현
 - 제품 결정 후 트랜스크립트/합의 매트릭스/보고서 화면 구현
 

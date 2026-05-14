@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import type { ProblemDetail } from '@/types/api'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 
 export const TOKEN_KEY = 'libra.accessToken'
 export const USER_KEY = 'libra.user'
