@@ -26,7 +26,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ProblemDetail>) => {
-    if (error.response?.status === 401) {
+    if (isAuthFailure(error)) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
@@ -37,3 +37,11 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+function isAuthFailure(error: AxiosError<ProblemDetail>) {
+  const status = error.response?.status
+  if (status === 401) return true
+
+  const data = error.response?.data as ProblemDetail & { error?: string }
+  return status === 403 && !data?.code && data?.error === 'Forbidden'
+}
