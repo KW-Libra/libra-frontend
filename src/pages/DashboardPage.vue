@@ -436,6 +436,9 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
 
 function agentLabel(agentId: string | null | undefined) {
   const labels: Record<string, string> = {
+    judge: 'Judge',
+    mediator: 'Mediator',
+    final_judge: 'Final Judge',
     disclosure: '공시',
     news: '뉴스',
     report: '리포트',
@@ -452,6 +455,26 @@ function agentLabel(agentId: string | null | undefined) {
   }
   if (!agentId) return 'Judge'
   return labels[agentId] ?? agentId
+}
+
+function phaseLabel(phase: string | null | undefined) {
+  const labels: Record<string, string> = {
+    agent_tool_loop: '도구 관찰',
+    agent_response: '에이전트 응답',
+    agent_response_repair: '에이전트 응답 보정',
+    core_routing: 'Core 라우팅',
+    core_routing_repair: 'Core 라우팅 보정',
+    domain_routing: 'Domain 라우팅',
+    domain_agent_response: 'Domain Agent 응답',
+    domain_router_primary: 'Domain LLM 호출',
+    domain_router_cross_validate: 'Domain 교차검증',
+    round2_target_selection: 'Round 2 표적 선택',
+    final_explanation: '최종 설명',
+    final_decision_preliminary: '최종 판단',
+    final_decision_final: '최종 판단'
+  }
+  if (!phase) return ''
+  return labels[phase] ?? phase
 }
 
 function nodeLabel(node: string | null | undefined) {
@@ -484,6 +507,16 @@ function debateTitle(event: RunEvent) {
       return `${agentLabel(event.data.agent_id)} 의견 제출`
     case 'agent_failed':
       return `${agentLabel(event.data.agent_id)} 실패`
+    case 'tool_observation':
+      return `${agentLabel(event.data.actor)} 도구 관찰`
+    case 'llm_prompt':
+      return `${agentLabel(event.data.actor)} 프롬프트 입력`
+    case 'llm_response':
+      return `${agentLabel(event.data.actor)} LLM 응답`
+    case 'llm_error':
+      return `${agentLabel(event.data.actor)} LLM 실패`
+    case 'llm_skipped':
+      return `${agentLabel(event.data.actor)} LLM 생략`
     case 'mediator_decision':
       return 'Mediator 조정'
     case 'consensus_updated':
@@ -521,6 +554,16 @@ function debateDetail(event: RunEvent) {
       return event.data.reasoning || event.data.limits_acknowledged || event.data.opinion || ''
     case 'agent_failed':
       return event.data.error
+    case 'tool_observation':
+      return `${event.data.tools.length}개 도구 관찰 결과를 LLM 컨텍스트에 반영했습니다.`
+    case 'llm_prompt':
+      return `${phaseLabel(event.data.phase)} 단계에서 ${event.data.model || 'LLM'}에 보낸 실제 입력입니다.`
+    case 'llm_response':
+      return `${phaseLabel(event.data.phase)} 단계에서 받은 원본 응답입니다.`
+    case 'llm_error':
+      return event.data.error
+    case 'llm_skipped':
+      return event.data.reason
     case 'mediator_decision':
       return event.data.rationale
     case 'final_decision_draft':
@@ -563,6 +606,15 @@ function debateMeta(event: RunEvent) {
   if (event.event === 'final_decision_draft') {
     return [event.data.decision, event.data.urgency].filter(Boolean).join(' · ')
   }
+  if (event.event === 'tool_observation') {
+    return phaseLabel(event.data.phase)
+  }
+  if (event.event === 'llm_prompt' || event.event === 'llm_response' || event.event === 'llm_error') {
+    return [phaseLabel(event.data.phase), event.data.model, event.data.tool_name].filter(Boolean).join(' · ')
+  }
+  if (event.event === 'llm_skipped') {
+    return phaseLabel(event.data.phase)
+  }
   if (event.event === 'interrupt_required') {
     return [event.data.decision, event.data.branch].filter(Boolean).join(' · ')
   }
@@ -578,15 +630,29 @@ function debateMeta(event: RunEvent) {
 }
 
 function debateToneClass(event: RunEvent) {
-  if (event.event === 'run_failed' || event.event === 'agent_failed') return 'border-red-200 bg-red-50'
+  if (event.event === 'run_failed' || event.event === 'agent_failed' || event.event === 'llm_error') return 'border-red-200 bg-red-50'
   if (event.event === 'interrupt_required') return 'border-amber-200 bg-amber-50'
   if (event.event === 'run_completed') return 'border-emerald-200 bg-emerald-50'
+  if (event.event === 'llm_prompt') return 'border-violet-200 bg-violet-50'
+  if (event.event === 'llm_response') return 'border-cyan-200 bg-cyan-50'
+  if (event.event === 'llm_skipped') return 'border-gray-200 bg-gray-100'
+  if (event.event === 'tool_observation') return 'border-indigo-200 bg-indigo-50'
   if (event.event === 'node_completed') return 'border-gray-200 bg-white'
   if (event.event === 'node_started' || event.event === 'run_started' || event.event === 'resume_received') return 'border-blue-200 bg-blue-50'
   if (event.event === 'final_decision_draft') return 'border-gray-900 bg-gray-50'
   if (event.event === 'agent_completed') return 'border-emerald-200 bg-emerald-50'
   if (event.event === 'agent_started') return 'border-blue-200 bg-blue-50'
   return 'border-gray-200 bg-white'
+}
+
+function formatUnknown(value: unknown) {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
 }
 </script>
 
@@ -768,6 +834,37 @@ function debateToneClass(event: RunEvent) {
                 <p v-if="debateDetail(event)" class="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
                   {{ debateDetail(event) }}
                 </p>
+                <div v-if="event.event === 'tool_observation'" class="mt-3 space-y-2">
+                  <div
+                    v-for="(tool, toolIndex) in event.data.tools"
+                    :key="`${tool.tool_name}-${toolIndex}`"
+                    class="rounded border border-white/70 bg-white px-3 py-2 text-xs text-gray-700"
+                  >
+                    <p class="font-semibold text-gray-900">{{ tool.tool_name }}</p>
+                    <p v-if="tool.purpose" class="mt-1">{{ tool.purpose }}</p>
+                    <p v-if="tool.summary" class="mt-1 whitespace-pre-wrap">{{ tool.summary }}</p>
+                  </div>
+                </div>
+                <div v-if="event.event === 'llm_prompt'" class="mt-3 space-y-3">
+                  <details open class="rounded border border-white/70 bg-white">
+                    <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700">System prompt</summary>
+                    <pre class="max-h-[360px] overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-5 text-gray-800">{{ event.data.system_prompt }}</pre>
+                  </details>
+                  <details open class="rounded border border-white/70 bg-white">
+                    <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700">User prompt</summary>
+                    <pre class="max-h-[520px] overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-5 text-gray-800">{{ event.data.user_prompt }}</pre>
+                  </details>
+                  <details v-if="event.data.input_schema" class="rounded border border-white/70 bg-white">
+                    <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700">Tool schema</summary>
+                    <pre class="max-h-[300px] overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-5 text-gray-800">{{ formatUnknown(event.data.input_schema) }}</pre>
+                  </details>
+                </div>
+                <div v-if="event.event === 'llm_response'" class="mt-3">
+                  <pre class="max-h-[520px] overflow-auto whitespace-pre-wrap rounded border border-white/70 bg-white p-3 text-xs leading-5 text-gray-800">{{ formatUnknown(event.data.output) }}</pre>
+                </div>
+                <div v-if="event.event === 'llm_skipped' && event.data.context" class="mt-3">
+                  <pre class="max-h-[260px] overflow-auto whitespace-pre-wrap rounded border border-white/70 bg-white p-3 text-xs leading-5 text-gray-800">{{ formatUnknown(event.data.context) }}</pre>
+                </div>
                 <div v-if="event.event === 'agent_completed' && event.data.focus_tickers?.length" class="mt-2 flex flex-wrap gap-1">
                   <span
                     v-for="ticker in event.data.focus_tickers"

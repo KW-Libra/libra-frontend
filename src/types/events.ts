@@ -9,6 +9,11 @@ export type RunEventName =
   | 'agent_started'
   | 'agent_completed'
   | 'agent_failed'
+  | 'tool_observation'
+  | 'llm_prompt'
+  | 'llm_response'
+  | 'llm_error'
+  | 'llm_skipped'
   | 'mediator_decision'
   | 'consensus_updated'
   | 'final_decision_draft'
@@ -60,6 +65,42 @@ export interface AgentToolCallSummary {
   tool_name: string
   purpose?: string | null
   summary?: string | null
+}
+
+export interface LlmTraceBase {
+  actor: string
+  phase: string
+  model?: string | null
+  tool_name?: string | null
+}
+
+export interface LlmPromptPayload extends LlmTraceBase {
+  temperature?: number | null
+  tool_description?: string | null
+  input_schema?: Record<string, unknown> | null
+  system_prompt: string
+  user_prompt: string
+}
+
+export interface LlmResponsePayload extends LlmTraceBase {
+  output: unknown
+}
+
+export interface LlmErrorPayload extends LlmTraceBase {
+  error: string
+}
+
+export interface LlmSkippedPayload {
+  actor: string
+  phase: string
+  reason: string
+  context?: Record<string, unknown>
+}
+
+export interface ToolObservationPayload {
+  actor: string
+  phase: string
+  tools: AgentToolCallSummary[]
 }
 
 export interface AgentCompletedPayload {
@@ -132,6 +173,26 @@ export type RunEvent =
         turn_number?: number | null
         error: string
       }
+    }
+  | {
+      event: 'tool_observation'
+      data: ToolObservationPayload
+    }
+  | {
+      event: 'llm_prompt'
+      data: LlmPromptPayload
+    }
+  | {
+      event: 'llm_response'
+      data: LlmResponsePayload
+    }
+  | {
+      event: 'llm_error'
+      data: LlmErrorPayload
+    }
+  | {
+      event: 'llm_skipped'
+      data: LlmSkippedPayload
     }
   | {
       event: 'mediator_decision'
