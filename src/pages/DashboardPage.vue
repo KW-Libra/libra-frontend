@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import type {
   DecimalValue,
   KisBalance,
+  KisCredentialRequest,
   KisOrderAudit,
   KisQuote,
   KisStatus,
@@ -23,9 +24,21 @@ const snapshots = ref<PortfolioSnapshot[]>([])
 const audits = ref<KisOrderAudit[]>([])
 const quote = ref<KisQuote | null>(null)
 const quoteSymbol = ref('005930')
+const credentialMessage = ref('')
+
+const credentialForm = reactive<KisCredentialRequest>({
+  environment: 'PAPER',
+  tradingEnabled: false,
+  appKey: '',
+  appSecret: '',
+  accountNumber: '',
+  accountProductCode: '01',
+  htsId: ''
+})
 
 const loading = reactive({
   profile: false,
+  credentials: false,
   status: false,
   balance: false,
   snapshots: false,
@@ -34,6 +47,7 @@ const loading = reactive({
 })
 
 const errors = reactive({
+  credentials: '',
   status: '',
   balance: '',
   snapshots: '',
@@ -99,10 +113,69 @@ async function loadKisStatus() {
   try {
     const res = await brokerApi.kisStatus()
     status.value = res.data
+    syncCredentialFormFromStatus()
   } catch (e) {
     errors.status = errorMessage(e, 'KIS 상태를 불러오지 못했습니다')
   } finally {
     loading.status = false
+  }
+}
+
+function syncCredentialFormFromStatus() {
+  if (!status.value) return
+  credentialForm.environment = status.value.environment === 'prod' ? 'PROD' : 'PAPER'
+  credentialForm.tradingEnabled = status.value.tradingEnabled
+}
+
+async function saveCredentials() {
+  errors.credentials = ''
+  credentialMessage.value = ''
+  const payload: KisCredentialRequest = {
+    ...credentialForm,
+    appKey: credentialForm.appKey.trim(),
+    appSecret: credentialForm.appSecret.trim(),
+    accountNumber: credentialForm.accountNumber.trim(),
+    accountProductCode: credentialForm.accountProductCode.trim(),
+    htsId: credentialForm.htsId?.trim() || undefined
+  }
+  if (!payload.appKey || !payload.appSecret || !payload.accountNumber || !payload.accountProductCode) {
+    errors.credentials = '필수 값을 입력하세요'
+    return
+  }
+  loading.credentials = true
+  try {
+    await brokerApi.saveKisCredentials(payload)
+    credentialForm.appKey = ''
+    credentialForm.appSecret = ''
+    credentialForm.htsId = ''
+    credentialMessage.value = '저장됨'
+    await loadKisStatus()
+  } catch (e) {
+    errors.credentials = errorMessage(e, 'KIS 키를 저장하지 못했습니다')
+  } finally {
+    loading.credentials = false
+  }
+}
+
+async function deleteCredentials() {
+  if (!window.confirm('등록된 KIS 키를 삭제할까요?')) return
+  errors.credentials = ''
+  credentialMessage.value = ''
+  loading.credentials = true
+  try {
+    await brokerApi.deleteKisCredentials()
+    credentialForm.appKey = ''
+    credentialForm.appSecret = ''
+    credentialForm.accountNumber = ''
+    credentialForm.accountProductCode = '01'
+    credentialForm.htsId = ''
+    credentialForm.tradingEnabled = false
+    credentialMessage.value = '삭제됨'
+    await loadKisStatus()
+  } catch (e) {
+    errors.credentials = errorMessage(e, 'KIS 키를 삭제하지 못했습니다')
+  } finally {
+    loading.credentials = false
   }
 }
 
@@ -202,6 +275,12 @@ function boolLabel(value: boolean | undefined) {
 function environmentLabel(value: string | undefined) {
   if (!value) return '-'
   return value === 'paper' ? '모의' : value
+}
+
+function credentialScopeLabel(value: string | undefined) {
+  if (value === 'user') return '계정'
+  if (value === 'server') return '서버'
+  return '미등록'
 }
 
 function toNumber(value: DecimalValue | undefined) {
@@ -341,6 +420,107 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
             </p>
           </div>
         </div>
+      </section>
+
+      <section class="mt-5 rounded border border-gray-200 bg-white">
+        <div class="flex flex-col gap-2 border-b border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-base font-semibold">KIS API 키</h2>
+            <p class="mt-1 text-sm text-gray-500">
+              {{ credentialScopeLabel(status?.credentialScope) }}
+              <span v-if="status?.maskedAccountNumber"> · {{ status.maskedAccountNumber }}</span>
+              <span v-if="status?.maskedAppKey"> · {{ status.maskedAppKey }}</span>
+            </p>
+          </div>
+          <span
+            class="w-fit rounded border px-2 py-1 text-xs font-medium"
+            :class="statusClass(status?.registered && status?.restConfigured && status?.accountConfigured)"
+          >
+            {{ status?.registered ? '등록됨' : '미등록' }}
+          </span>
+        </div>
+
+        <form class="grid gap-3 p-4 lg:grid-cols-6" autocomplete="off" @submit.prevent="saveCredentials">
+          <label class="block lg:col-span-1">
+            <span class="text-xs text-gray-500">환경</span>
+            <select
+              v-model="credentialForm.environment"
+              class="mt-1 h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-gray-900 focus:outline-none"
+            >
+              <option value="PAPER">모의</option>
+              <option value="PROD">실전</option>
+            </select>
+          </label>
+          <label class="block lg:col-span-1">
+            <span class="text-xs text-gray-500">계좌번호</span>
+            <input
+              v-model="credentialForm.accountNumber"
+              inputmode="numeric"
+              maxlength="12"
+              class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
+              placeholder="12345678"
+            />
+          </label>
+          <label class="block lg:col-span-1">
+            <span class="text-xs text-gray-500">상품코드</span>
+            <input
+              v-model="credentialForm.accountProductCode"
+              inputmode="numeric"
+              maxlength="2"
+              class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
+              placeholder="01"
+            />
+          </label>
+          <label class="block lg:col-span-1">
+            <span class="text-xs text-gray-500">App Key</span>
+            <input
+              v-model="credentialForm.appKey"
+              type="password"
+              class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
+            />
+          </label>
+          <label class="block lg:col-span-1">
+            <span class="text-xs text-gray-500">App Secret</span>
+            <input
+              v-model="credentialForm.appSecret"
+              type="password"
+              class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
+            />
+          </label>
+          <label class="block lg:col-span-1">
+            <span class="text-xs text-gray-500">HTS ID</span>
+            <input
+              v-model="credentialForm.htsId"
+              class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
+            />
+          </label>
+
+          <div class="flex flex-col gap-3 lg:col-span-6 sm:flex-row sm:items-center sm:justify-between">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input v-model="credentialForm.tradingEnabled" type="checkbox" class="h-4 w-4 rounded border-gray-300" />
+              주문전송 허용
+            </label>
+            <div class="flex flex-wrap items-center gap-2">
+              <span v-if="credentialMessage" class="text-sm text-emerald-700">{{ credentialMessage }}</span>
+              <span v-if="errors.credentials" class="text-sm text-red-600">{{ errors.credentials }}</span>
+              <button
+                type="button"
+                class="h-9 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                :disabled="loading.credentials || !status?.registered"
+                @click="deleteCredentials"
+              >
+                삭제
+              </button>
+              <button
+                type="submit"
+                class="h-9 rounded bg-gray-900 px-3 text-sm text-white hover:bg-gray-800 disabled:opacity-50"
+                :disabled="loading.credentials"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </form>
       </section>
 
       <section class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">

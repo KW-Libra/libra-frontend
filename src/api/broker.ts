@@ -1,6 +1,8 @@
 import { api } from './client'
 import type {
   KisBalance,
+  KisCredentialRequest,
+  KisCredentialStatus,
   KisOrderAudit,
   KisQuote,
   KisStatus,
@@ -10,6 +12,12 @@ import type {
 
 export const brokerApi = {
   kisStatus: () => api.get<KisStatus>('/api/market/kis/status'),
+
+  saveKisCredentials: (payload: KisCredentialRequest) =>
+    api.put<KisCredentialStatus>('/api/broker/kis/credentials', payload),
+
+  deleteKisCredentials: () =>
+    api.delete<void>('/api/broker/kis/credentials'),
 
   kisQuote: (symbol: string, marketCode = 'J') =>
     api.get<KisQuote>(`/api/market/kis/quotes/${encodeURIComponent(symbol)}`, {

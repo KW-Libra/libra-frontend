@@ -33,6 +33,8 @@ export interface UserProfile {
 export type DecimalValue = number | string | null
 
 export interface KisStatus {
+  registered: boolean
+  credentialScope: 'none' | 'server' | 'user' | string
   enabled: boolean
   tradingEnabled: boolean
   environment: string
@@ -40,10 +42,36 @@ export interface KisStatus {
   restConfigured: boolean
   accountConfigured: boolean
   webSocketConfigured: boolean
+  maskedAppKey: string | null
+  maskedAccountNumber: string | null
   maxOrderQuantity: number
   maxOrderAmount: DecimalValue
   symbolAllowListEnabled: boolean
   allowedSymbolsCount: number
+}
+
+export interface KisCredentialRequest {
+  environment: 'PAPER' | 'PROD'
+  tradingEnabled: boolean
+  appKey: string
+  appSecret: string
+  accountNumber: string
+  accountProductCode: string
+  htsId?: string
+}
+
+export interface KisCredentialStatus {
+  registered: boolean
+  credentialScope: string
+  enabled: boolean
+  tradingEnabled: boolean
+  environment: string
+  restConfigured: boolean
+  accountConfigured: boolean
+  webSocketConfigured: boolean
+  maskedAppKey: string | null
+  maskedAccountNumber: string | null
+  updatedAt: string | null
 }
 
 export interface KisQuote {
