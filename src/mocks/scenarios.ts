@@ -1,13 +1,11 @@
 /**
- * src/mocks/scenarios.ts
+ * src/mocks/scenarios.ts v2
  *
- * 세 시나리오 통합 + 분기별 추가 타입.
- *
+ * 4분기 모두 지원:
  * - FOMC (§7.2) → STRONG_CONFLICT (USER_DECISION_REQUIRED)
  * - KOSPI 한도 위반 (§7.1) → STRONG_REBALANCE
  * - 방산 ETF ESG (§7.3) → COMPLIANCE_VETO
- *
- * 기존 scenarioFomc.ts의 타입을 재export하고 두 시나리오 추가.
+ * - 신규: 단기채 비중 조정 → WEAK_CONSERVATIVE
  */
 
 import {
@@ -29,7 +27,6 @@ import {
   type PortfolioContext,
 } from './scenarioFomc'
 
-// 재export
 export {
   scenarioFomc,
   type FinalState,
@@ -49,29 +46,37 @@ export {
   type PortfolioContext,
 }
 
-// =============================================================================
-// 분기별 결정 영역 추가 데이터
-// =============================================================================
-
-/**
- * STRONG_REBALANCE 분기 — 자동 리밸런싱 권고.
- * 위원회가 일치 → 시스템이 자동 결정 trade를 산정.
- */
 export interface AutoRebalanceProposal {
   reasoning: string
   trades: Array<{
     ticker: string
     name: string
-    change: number // 비중 변화 % (음수=매도, 양수=매수)
+    change: number
   }>
   estimatedVolatilityAfter: number
   estimatedCostKrw: number
 }
 
 /**
- * COMPLIANCE_VETO 분기 — 위원회 합의가 있어도 hard rule이 막음.
- * 사용자에게 3개의 후속 옵션 제시.
+ * WEAK_CONSERVATIVE 분기 전용 - 원래 권고와 축소된 권고 둘 다 표시.
  */
+export interface ConservativeProposal {
+  reasoning: string
+  originalTrades: Array<{
+    ticker: string
+    name: string
+    change: number
+  }>
+  conservativeTrades: Array<{
+    ticker: string
+    name: string
+    change: number
+  }>
+  reductionFactor: number // 보통 0.5
+  estimatedVolatilityAfter: number
+  estimatedCostKrw: number
+}
+
 export interface ComplianceVetoOption {
   id: string
   label: string
@@ -80,14 +85,15 @@ export interface ComplianceVetoOption {
   tone: 'safe' | 'override' | 'alternative'
 }
 
+export interface FinalStateExt extends FinalState {
+  autoProposal?: AutoRebalanceProposal
+  conservativeProposal?: ConservativeProposal
+  vetoOptions?: ComplianceVetoOption[]
+}
+
 // =============================================================================
 // §7.1 KOSPI 한도 위반 — STRONG_REBALANCE
 // =============================================================================
-
-export interface FinalStateExt extends FinalState {
-  autoProposal?: AutoRebalanceProposal
-  vetoOptions?: ComplianceVetoOption[]
-}
 
 export const scenarioKospi: FinalStateExt = {
   threadId: 'run_kospi_2026_05_15_001',
@@ -215,7 +221,7 @@ export const scenarioKospi: FinalStateExt = {
     thresholds: { strong: 0.6, weak: 0.3 },
   },
 
-  options: [], // STRONG_REBALANCE는 옵션 없음, autoProposal 사용
+  options: [],
 
   autoProposal: {
     reasoning:
@@ -344,8 +350,7 @@ export const scenarioEsg: FinalStateExt = {
       agent: 'ESG', committee: 'DOMAIN', role: 'opinion',
       direction: 'DECREASE', magnitude: -5, confidence: 0.95,
       summary: 'WEAPONS 섹터 — 사용자 제외',
-      reasoning:
-        '사용자가 IPS에서 WEAPONS 섹터를 명시 제외함. 449450은 그 섹터에 해당. 매수 비추.',
+      reasoning: '사용자가 IPS에서 WEAPONS 섹터를 명시 제외함. 449450은 그 섹터에 해당. 매수 비추.',
       deltaFromRound1: 'STRENGTHENED',
     },
   ],
@@ -357,7 +362,7 @@ export const scenarioEsg: FinalStateExt = {
     thresholds: { strong: 0.6, weak: 0.3 },
   },
 
-  options: [], // COMPLIANCE_VETO는 다른 옵션 사용, vetoOptions 참조
+  options: [],
 
   vetoOptions: [
     {
@@ -385,13 +390,162 @@ export const scenarioEsg: FinalStateExt = {
 }
 
 // =============================================================================
-// 시나리오 매핑 — threadId prefix로 결정
+// 신규: 단기채 비중 조정 — WEAK_CONSERVATIVE
+// =============================================================================
+
+export const scenarioWeak: FinalStateExt = {
+  threadId: 'run_weak_2026_05_15_003',
+  trigger: 'scheduled_weekly_check',
+  query: '단기채(153130) 비중 조정 — 약한 합의 도출',
+
+  startedAt: '2026-05-15T15:20:08+09:00',
+  completedAt: '2026-05-15T15:20:19+09:00',
+  durationSeconds: 11.4,
+
+  triggerMeta: {
+    type: 'scheduled',
+    label: '주간 정기 점검',
+    description: '주 1회 포트폴리오 균형 자동 검토',
+  },
+
+  context: {
+    portfolioName: '내 IPS 포트폴리오',
+    affectedAssets: [
+      { ticker: '153130', name: '단기채권' },
+      { ticker: '069500', name: 'KODEX 200' },
+    ],
+    currentValueKrw: 47_280_000,
+  },
+
+  stages: [
+    { name: 'compliance_check', label: 'Compliance', completed: true, durationMs: 100 },
+    { name: 'round1', label: 'Round 1', completed: true, durationMs: 4100 },
+    { name: 'mediator', label: 'Mediator', completed: true, durationMs: 1100 },
+    { name: 'round2', label: 'Round 2', completed: true, durationMs: 3200 },
+    { name: 'final_judge', label: 'Final Judge', completed: true, durationMs: 2900 },
+  ],
+
+  compliance: {
+    severity: 'PASS',
+    title: '제약 조건 모두 충족',
+    detail: '단일종목 한도 / 변동성 / ESG 정책 모두 통과',
+    ruleId: 'IPS_ALL_RULES',
+  },
+
+  speeches: [
+    {
+      agent: 'Disclosure', committee: 'CORE', role: 'opinion',
+      direction: 'HOLD', magnitude: 0, confidence: 0.5,
+      summary: '관련 공시 없음',
+      reasoning: '단기채권 구성 종목 중 신규 공시 없음.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'News', committee: 'CORE', role: 'opinion',
+      direction: 'INCREASE', magnitude: 2, confidence: 0.55,
+      summary: '금리 동결 전망',
+      reasoning: '주요 매체에서 다음 금리 결정 동결 전망. 단기채에 우호적이나 강한 시그널 아님.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'Report', committee: 'CORE', role: 'opinion',
+      direction: 'INCREASE', magnitude: 3, confidence: 0.6,
+      summary: '안정자산 비중 확대 추천',
+      reasoning: 'IB 컨센서스에서 단기 변동성 확대 가능성, 안정자산 비중 소폭 확대 권고.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'Profit', committee: 'CORE', role: 'opinion',
+      direction: 'INCREASE', magnitude: 4, confidence: 0.55,
+      summary: '리스크 대비 수익 비율 양호',
+      reasoning: '단기채 수익률 안정적, 변동성 대비 수익 비율 양호. +4%p 권고하나 확신도 낮음.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'Cost', committee: 'CORE', role: 'informational',
+      direction: 'HOLD', magnitude: 0, confidence: 0,
+      summary: '거래비용 미미',
+      reasoning: '단기채 거래 비용 약 5천원. 영향 무시 가능.',
+      deltaFromRound1: null,
+    },
+    {
+      agent: 'Risk', committee: 'DOMAIN', role: 'opinion',
+      direction: 'INCREASE', magnitude: 3, confidence: 0.6,
+      summary: '변동성 관점에서 우호',
+      reasoning: '단기채 비중 확대는 포트폴리오 변동성 감소에 기여. 그러나 한도 미달이라 시급성 낮음.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'Tax', committee: 'DOMAIN', role: 'informational',
+      direction: 'HOLD', magnitude: 0, confidence: 0,
+      summary: '세영향 미미',
+      reasoning: '단기채 매매 양도세 영향 거의 없음.',
+      deltaFromRound1: null,
+    },
+    {
+      agent: 'Macro', committee: 'DOMAIN', role: 'opinion',
+      direction: 'HOLD', magnitude: 0, confidence: 0.5,
+      summary: '거시 환경 중립',
+      reasoning: '경제 펀더멘털 안정. 매크로 측면에서 비중 조정 사유 강하지 않음.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'Sentiment', committee: 'DOMAIN', role: 'opinion',
+      direction: 'INCREASE', magnitude: 2, confidence: 0.5,
+      summary: '안정자산 선호 약간 ↑',
+      reasoning: '시장 sentiment 지표상 안정자산 선호도 약간 상승. 강한 시그널 아님.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+    {
+      agent: 'Execution', committee: 'DOMAIN', role: 'informational',
+      direction: 'HOLD', magnitude: 0, confidence: 0,
+      summary: '체결 양호',
+      reasoning: '단일 체결 가능, 슬리피지 없음.',
+      deltaFromRound1: null,
+    },
+    {
+      agent: 'ESG', committee: 'DOMAIN', role: 'opinion',
+      direction: 'HOLD', magnitude: 0, confidence: 0.5,
+      summary: '해당 사항 없음',
+      reasoning: '단기채는 ESG 정책 적용 대상 아님.',
+      deltaFromRound1: 'UNCHANGED',
+    },
+  ],
+
+  consensus: {
+    round1: 0.38,
+    round2: 0.42,
+    branch: 'WEAK_CONSERVATIVE',
+    thresholds: { strong: 0.6, weak: 0.3 },
+  },
+
+  options: [],
+
+  conservativeProposal: {
+    reasoning:
+      '위원회 합의 점수 +0.42 (WEAK_CONSENSUS · INCREASE). 한 방향 합의는 있으나 강도가 약하고 confidence도 전반적으로 낮음 (평균 0.55). 시스템이 권고 강도를 절반으로 줄여 보수적으로 처리합니다.',
+    originalTrades: [
+      { ticker: '153130', name: '단기채권', change: +4 },
+      { ticker: '069500', name: 'KODEX 200', change: -4 },
+    ],
+    conservativeTrades: [
+      { ticker: '153130', name: '단기채권', change: +2 },
+      { ticker: '069500', name: 'KODEX 200', change: -2 },
+    ],
+    reductionFactor: 0.5,
+    estimatedVolatilityAfter: 22,
+    estimatedCostKrw: 8_500,
+  },
+}
+
+// =============================================================================
+// 시나리오 매핑
 // =============================================================================
 
 export function resolveScenario(threadId: string): FinalStateExt {
   if (threadId.startsWith('run_kospi')) return scenarioKospi
   if (threadId.startsWith('run_esg')) return scenarioEsg
-  // default — FOMC (기존 USER_DECISION)
+  if (threadId.startsWith('run_weak')) return scenarioWeak
   return scenarioFomc as FinalStateExt
 }
 
@@ -409,6 +563,13 @@ export const scenarioCatalog = [
     description: '위원회가 일치하여 시스템이 자동 처리',
     branch: 'STRONG_REBALANCE' as const,
     threadIdPrefix: 'run_kospi',
+  },
+  {
+    id: 'weak',
+    label: '단기채 조정 (약한 합의 → 보수적)',
+    description: '한 방향 합의지만 강도 약함, 권고 강도 50% 반영',
+    branch: 'WEAK_CONSERVATIVE' as const,
+    threadIdPrefix: 'run_weak',
   },
   {
     id: 'esg',

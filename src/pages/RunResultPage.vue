@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
- * src/pages/RunResultPage.vue v3
+ * src/pages/RunResultPage.vue v4
  *
  * Run 결과 화면 — 4분기 모두 지원.
- * 라우트: /run/:threadId/result
  *
- * 분기 처리:
  * - STRONG_CONFLICT → 3옵션 카드 (USER_DECISION)
- * - STRONG_REBALANCE → autoProposal 카드 (승인/거절 2버튼)
- * - COMPLIANCE_VETO → vetoOptions 3옵션 + 위원회에 반투명 오버레이
- * - WEAK_CONSERVATIVE → 다음 iteration (현재 미구현, fallback to USER_DECISION)
+ * - STRONG_REBALANCE → autoProposal 카드 (자동 권고 + 승인/거절)
+ * - WEAK_CONSERVATIVE → conservativeProposal 카드 (원래 권고 vs 50% 축소된 권고)
+ * - COMPLIANCE_VETO → vetoOptions 3옵션 + 위원회 반투명 오버레이
  */
 
 import { ref, computed } from 'vue'
@@ -50,6 +48,9 @@ const isAutoRebalance = computed(
   () => scenario.consensus.branch === 'STRONG_REBALANCE'
 )
 const isConflict = computed(() => scenario.consensus.branch === 'STRONG_CONFLICT')
+const isWeakConservative = computed(
+  () => scenario.consensus.branch === 'WEAK_CONSERVATIVE'
+)
 
 const complianceTone = computed(() => {
   if (scenario.compliance.severity === 'BLOCKING') return 'danger'
@@ -187,10 +188,6 @@ function vetoToneRing(tone: 'safe' | 'override' | 'alternative'): string {
   return 'border-l-blue-400'
 }
 
-// =============================================================================
-// 결정 처리
-// =============================================================================
-
 function saveDecisionToHistory(
   optionLabel: string,
   status: 'approved' | 'cancelled'
@@ -206,7 +203,6 @@ function saveDecisionToHistory(
   sessionStorage.setItem('libra_decisions', JSON.stringify(history.slice(0, 10)))
 }
 
-// USER_DECISION 옵션 승인
 function approveOption() {
   if (!expandedOptionData.value) return
   const option = expandedOptionData.value
@@ -223,7 +219,6 @@ function approveOption() {
   }, 1800)
 }
 
-// STRONG_REBALANCE 자동 권고 승인
 function approveAutoRebalance() {
   isProcessing.value = true
   processingLabel.value = '자동 리밸런싱 실행 중...'
@@ -233,7 +228,15 @@ function approveAutoRebalance() {
   }, 1800)
 }
 
-// COMPLIANCE_VETO 옵션 처리
+function approveConservative() {
+  isProcessing.value = true
+  processingLabel.value = '보수적 리밸런싱 실행 중...'
+  setTimeout(() => {
+    saveDecisionToHistory('보수적 리밸런싱 (50%)', 'approved')
+    router.push('/dashboard')
+  }, 1800)
+}
+
 function processVetoOption() {
   if (!expandedVetoData.value) return
   const option = expandedVetoData.value
@@ -271,7 +274,6 @@ function cancelDecision() {
 
 <template>
   <div class="min-h-screen bg-gray-50 text-gray-900">
-    <!-- 처리 중 오버레이 -->
     <div
       v-if="isProcessing"
       class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center"
@@ -295,6 +297,8 @@ function cancelDecision() {
                   ? 'text-red-700 bg-red-50 border-red-200'
                   : isAutoRebalance
                   ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : isWeakConservative
+                  ? 'text-amber-700 bg-amber-50 border-amber-200'
                   : 'text-amber-700 bg-amber-50 border-amber-200'
               "
             >
@@ -305,6 +309,8 @@ function cancelDecision() {
                     ? 'bg-red-500'
                     : isAutoRebalance
                     ? 'bg-emerald-500'
+                    : isWeakConservative
+                    ? 'bg-amber-500'
                     : 'bg-amber-500'
                 "
               ></span>
@@ -328,16 +334,12 @@ function cancelDecision() {
         <div class="flex items-center gap-6 text-xs flex-wrap">
           <div>
             <span class="text-gray-400">포트폴리오</span>
-            <span class="ml-1.5 font-medium text-gray-800">{{
-              scenario.context.portfolioName
-            }}</span>
+            <span class="ml-1.5 font-medium text-gray-800">{{ scenario.context.portfolioName }}</span>
           </div>
           <div class="h-3 w-px bg-gray-200"></div>
           <div>
             <span class="text-gray-400">평가액</span>
-            <span class="ml-1.5 font-medium text-gray-800 font-mono">{{
-              formatKrw(scenario.context.currentValueKrw)
-            }}</span>
+            <span class="ml-1.5 font-medium text-gray-800 font-mono">{{ formatKrw(scenario.context.currentValueKrw) }}</span>
           </div>
           <div class="h-3 w-px bg-gray-200"></div>
           <div class="flex items-center gap-2 flex-wrap">
@@ -346,9 +348,7 @@ function cancelDecision() {
               v-for="a in scenario.context.affectedAssets"
               :key="a.ticker"
               class="px-2 py-0.5 bg-white border border-gray-200 rounded font-mono text-[11px] text-gray-700"
-            >
-              {{ a.ticker }} · {{ a.name }}
-            </span>
+            >{{ a.ticker }} · {{ a.name }}</span>
           </div>
         </div>
       </div>
@@ -445,9 +445,8 @@ function cancelDecision() {
         </div>
       </div>
 
-      <!-- 위원회 영역 (BLOCKING 시 반투명 + 안내) -->
+      <!-- 위원회 영역 -->
       <div class="relative">
-        <!-- BLOCKING 오버레이 -->
         <div
           v-if="isVeto"
           class="absolute inset-0 bg-gray-50/60 backdrop-blur-[1px] z-10 rounded-lg flex items-start justify-center pt-10"
@@ -624,6 +623,7 @@ function cancelDecision() {
               :class="{
                 'text-red-700 bg-red-50 border-red-200': isVeto || isConflict,
                 'text-emerald-700 bg-emerald-50 border-emerald-200': isAutoRebalance,
+                'text-amber-700 bg-amber-50 border-amber-200': isWeakConservative,
               }"
             >
               <span
@@ -631,6 +631,7 @@ function cancelDecision() {
                 :class="{
                   'bg-red-500': isVeto || isConflict,
                   'bg-emerald-500': isAutoRebalance,
+                  'bg-amber-500': isWeakConservative,
                 }"
               ></span>
               {{ scenario.consensus.branch }}
@@ -661,11 +662,9 @@ function cancelDecision() {
         </div>
       </div>
 
-      <!-- ================================================================ -->
       <!-- 결정 영역 — 분기별 swap -->
-      <!-- ================================================================ -->
 
-      <!-- 분기 1: STRONG_CONFLICT → USER_DECISION 3옵션 -->
+      <!-- 분기 1: STRONG_CONFLICT -->
       <div v-if="isConflict">
         <div class="mb-5">
           <h2 class="text-lg font-medium text-gray-900 mb-1">결정이 필요합니다</h2>
@@ -686,18 +685,11 @@ function cancelDecision() {
           >
             <div class="flex items-start justify-between mb-2">
               <div class="text-base font-medium text-gray-900">{{ option.label }}</div>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded font-medium"
-                :class="riskLabelClass(option.riskLabel)"
-              >위험 {{ option.riskLabel }}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded font-medium" :class="riskLabelClass(option.riskLabel)">위험 {{ option.riskLabel }}</span>
             </div>
             <div class="text-xs text-gray-500 mb-4 leading-relaxed">{{ option.description }}</div>
             <div class="space-y-1 mb-4">
-              <div
-                v-for="trade in option.trades"
-                :key="trade"
-                class="text-sm font-mono text-gray-800"
-              >{{ trade }}</div>
+              <div v-for="trade in option.trades" :key="trade" class="text-sm font-mono text-gray-800">{{ trade }}</div>
             </div>
             <div class="flex items-center justify-between pt-3 border-t border-gray-100">
               <div>
@@ -712,10 +704,7 @@ function cancelDecision() {
           </div>
         </div>
 
-        <div
-          v-if="expandedOptionData"
-          class="mt-4 p-5 bg-blue-50/50 rounded-lg border border-blue-200"
-        >
+        <div v-if="expandedOptionData" class="mt-4 p-5 bg-blue-50/50 rounded-lg border border-blue-200">
           <div class="flex items-baseline justify-between mb-3">
             <div class="text-sm font-medium text-gray-900">
               {{ expandedOptionData.label }} —
@@ -726,11 +715,7 @@ function cancelDecision() {
             </div>
           </div>
           <div class="space-y-3">
-            <div
-              v-for="agentName in expandedOptionData.supportingAgents"
-              :key="agentName"
-              class="flex gap-3"
-            >
+            <div v-for="agentName in expandedOptionData.supportingAgents" :key="agentName" class="flex gap-3">
               <div class="text-xs font-medium text-blue-700 w-20 flex-shrink-0 pt-0.5">{{ agentName }}</div>
               <div class="text-xs text-gray-700 leading-relaxed flex-1">{{ findSpeech(agentName)?.reasoning }}</div>
             </div>
@@ -743,10 +728,7 @@ function cancelDecision() {
             시스템은 결정을 대신하지 않습니다.
           </div>
           <div class="flex gap-2">
-            <button
-              @click="cancelDecision"
-              class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-            >취소</button>
+            <button @click="cancelDecision" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">취소</button>
             <button
               @click="approveOption"
               class="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-md hover:bg-black transition disabled:opacity-40 disabled:cursor-not-allowed"
@@ -756,40 +738,27 @@ function cancelDecision() {
         </div>
       </div>
 
-      <!-- 분기 2: STRONG_REBALANCE → 자동 권고 + 승인/거절 -->
+      <!-- 분기 2: STRONG_REBALANCE -->
       <div v-else-if="isAutoRebalance && scenario.autoProposal">
         <div class="mb-5">
           <div class="flex items-center gap-2 mb-1">
             <h2 class="text-lg font-medium text-gray-900">자동 리밸런싱 권고</h2>
-            <span class="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">
-              위원회 합의 강함
-            </span>
+            <span class="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">위원회 합의 강함</span>
           </div>
-          <p class="text-sm text-gray-600">
-            위원회가 일치된 판단을 내렸습니다. 시스템이 자동으로 거래안을 산정했습니다.
-          </p>
+          <p class="text-sm text-gray-600">위원회가 일치된 판단을 내렸습니다. 시스템이 자동으로 거래안을 산정했습니다.</p>
         </div>
 
         <div class="bg-white border border-emerald-200 border-l-4 border-l-emerald-500 rounded-lg p-6">
-          <div class="text-xs text-gray-600 mb-5 leading-relaxed bg-emerald-50/50 p-3 rounded">
-            {{ scenario.autoProposal.reasoning }}
-          </div>
+          <div class="text-xs text-gray-600 mb-5 leading-relaxed bg-emerald-50/50 p-3 rounded">{{ scenario.autoProposal.reasoning }}</div>
 
           <div class="text-xs font-medium tracking-wider text-gray-500 mb-3">제안 거래</div>
           <div class="space-y-2 mb-5">
-            <div
-              v-for="t in scenario.autoProposal.trades"
-              :key="t.ticker"
-              class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded"
-            >
+            <div v-for="t in scenario.autoProposal.trades" :key="t.ticker" class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded">
               <div class="flex items-center gap-3">
                 <span class="text-xs font-mono text-gray-500 w-14">{{ t.ticker }}</span>
                 <span class="text-sm text-gray-800">{{ t.name }}</span>
               </div>
-              <div
-                class="text-base font-mono font-semibold"
-                :class="t.change > 0 ? 'text-emerald-700' : 'text-red-700'"
-              >{{ t.change > 0 ? '+' : '' }}{{ t.change }}%p</div>
+              <div class="text-base font-mono font-semibold" :class="t.change > 0 ? 'text-emerald-700' : 'text-red-700'">{{ t.change > 0 ? '+' : '' }}{{ t.change }}%p</div>
             </div>
           </div>
 
@@ -814,26 +783,113 @@ function cancelDecision() {
             거절하면 다른 결정 옵션을 검토할 수 있습니다.
           </div>
           <div class="flex gap-2">
-            <button
-              @click="cancelDecision"
-              class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-            >거절</button>
-            <button
-              @click="approveAutoRebalance"
-              class="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition"
-            >자동 리밸런싱 승인</button>
+            <button @click="cancelDecision" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">거절</button>
+            <button @click="approveAutoRebalance" class="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition">자동 리밸런싱 승인</button>
           </div>
         </div>
       </div>
 
-      <!-- 분기 3: COMPLIANCE_VETO → 3옵션 (취소 / 완화 / 대체) -->
+      <!-- 분기 3: WEAK_CONSERVATIVE -->
+      <div v-else-if="isWeakConservative && scenario.conservativeProposal">
+        <div class="mb-5">
+          <div class="flex items-center gap-2 mb-1">
+            <h2 class="text-lg font-medium text-gray-900">보수적 리밸런싱 권고</h2>
+            <span class="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">권고 강도 50% 반영</span>
+          </div>
+          <p class="text-sm text-gray-600">
+            위원회가 한 방향으로 기울었지만 강도가 약합니다. 시스템이 권고 강도를 절반으로 줄여 보수적으로 처리합니다.
+          </p>
+        </div>
+
+        <div class="bg-white border border-amber-200 border-l-4 border-l-amber-400 rounded-lg p-6">
+          <div class="text-xs text-gray-600 mb-5 leading-relaxed bg-amber-50/50 p-3 rounded">
+            {{ scenario.conservativeProposal.reasoning }}
+          </div>
+
+          <!-- 원래 권고 vs 축소된 권고 비교 -->
+          <div class="grid grid-cols-2 gap-3 mb-5">
+            <!-- 원래 권고 (참고) -->
+            <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div class="flex items-baseline justify-between mb-3">
+                <div class="text-xs font-medium tracking-wider text-gray-500">위원회 원안</div>
+                <span class="text-[9px] text-gray-400 italic">참고용</span>
+              </div>
+              <div class="space-y-1.5">
+                <div
+                  v-for="t in scenario.conservativeProposal.originalTrades"
+                  :key="t.ticker"
+                  class="flex items-center justify-between text-xs"
+                >
+                  <span class="text-gray-500">{{ t.ticker }} · {{ t.name }}</span>
+                  <span
+                    class="font-mono font-medium"
+                    :class="t.change > 0 ? 'text-emerald-600' : 'text-red-600'"
+                  >{{ t.change > 0 ? '+' : '' }}{{ t.change }}%p</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 축소된 권고 (실제 적용) -->
+            <div class="p-4 bg-amber-50/50 border border-amber-200 rounded-lg relative">
+              <div class="flex items-baseline justify-between mb-3">
+                <div class="text-xs font-medium tracking-wider text-amber-700">시스템 적용안 (50%)</div>
+                <span class="text-[9px] text-amber-700 font-medium">실제 거래</span>
+              </div>
+              <div class="space-y-1.5">
+                <div
+                  v-for="t in scenario.conservativeProposal.conservativeTrades"
+                  :key="t.ticker"
+                  class="flex items-center justify-between text-xs"
+                >
+                  <span class="text-gray-700 font-medium">{{ t.ticker }} · {{ t.name }}</span>
+                  <span
+                    class="font-mono font-semibold"
+                    :class="t.change > 0 ? 'text-emerald-700' : 'text-red-700'"
+                  >{{ t.change > 0 ? '+' : '' }}{{ t.change }}%p</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 화살표 인디케이터 -->
+          <div class="flex items-center justify-center -mt-2 mb-4">
+            <div class="flex items-center gap-2 text-[10px] text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+              <span class="font-mono">×{{ scenario.conservativeProposal.reductionFactor }}</span>
+              <span>합의 강도가 약하여 권고를 절반만 적용</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="p-3 bg-gray-50 rounded">
+              <div class="text-[10px] text-gray-500 tracking-wider mb-1">거래 후 변동성</div>
+              <div class="text-lg font-mono font-semibold text-gray-900">
+                {{ scenario.conservativeProposal.estimatedVolatilityAfter }}%
+              </div>
+            </div>
+            <div class="p-3 bg-gray-50 rounded">
+              <div class="text-[10px] text-gray-500 tracking-wider mb-1">예상 거래 비용</div>
+              <div class="text-lg font-mono font-semibold text-gray-900">{{ formatKrw(scenario.conservativeProposal.estimatedCostKrw) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+          <div class="text-xs text-gray-500">
+            <span class="font-medium text-gray-700">약한 합의</span>는 한 방향으로 기울지만 확신이 낮은 경우 — 시스템이 보수적으로 절반만 반영합니다.
+          </div>
+          <div class="flex gap-2">
+            <button @click="cancelDecision" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">거절</button>
+            <button @click="approveConservative" class="px-4 py-2 text-sm font-medium bg-amber-600 text-white rounded-md hover:bg-amber-700 transition">보수적 권고 승인</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 분기 4: COMPLIANCE_VETO -->
       <div v-else-if="isVeto && scenario.vetoOptions">
         <div class="mb-5">
           <div class="flex items-center gap-2 mb-1">
             <h2 class="text-lg font-medium text-gray-900">정책 위반으로 자동 거부됨</h2>
-            <span class="text-[10px] px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
-              COMPLIANCE VETO
-            </span>
+            <span class="text-[10px] px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">COMPLIANCE VETO</span>
           </div>
           <p class="text-sm text-gray-600">
             위원회 합의와 무관하게 사용자 정책이 거래를 차단했습니다. 다음 옵션 중 하나를 선택하세요.
@@ -853,19 +909,11 @@ function cancelDecision() {
           >
             <div class="flex items-start justify-between mb-2">
               <div class="text-base font-medium text-gray-900">{{ option.label }}</div>
-              <span
-                v-if="option.tone === 'safe'"
-                class="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded font-medium"
-              >권장</span>
-              <span
-                v-else-if="option.tone === 'override'"
-                class="text-[10px] px-2 py-0.5 bg-red-50 text-red-700 rounded font-medium"
-              >명시 동의 필요</span>
+              <span v-if="option.tone === 'safe'" class="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded font-medium">권장</span>
+              <span v-else-if="option.tone === 'override'" class="text-[10px] px-2 py-0.5 bg-red-50 text-red-700 rounded font-medium">명시 동의 필요</span>
             </div>
             <div class="text-xs text-gray-500 mb-4 leading-relaxed">{{ option.description }}</div>
-            <div class="text-xs text-gray-700 leading-relaxed pt-3 border-t border-gray-100">
-              {{ option.consequence }}
-            </div>
+            <div class="text-xs text-gray-700 leading-relaxed pt-3 border-t border-gray-100">{{ option.consequence }}</div>
           </div>
         </div>
 
