@@ -3,7 +3,9 @@ import axios from 'axios'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { brokerApi } from '@/api/broker'
+import type { RunStartBody } from '@/api/sse'
 import { useAuthStore } from '@/stores/auth'
+import { useRunStreamStore } from '@/stores/runStream'
 import type {
   DecimalValue,
   KisBalance,
@@ -14,9 +16,11 @@ import type {
   PortfolioSnapshot,
   ProblemDetail
 } from '@/types/api'
+import type { RunEvent } from '@/types/events'
 
 const router = useRouter()
 const auth = useAuthStore()
+const runStream = useRunStreamStore()
 
 const status = ref<KisStatus | null>(null)
 const balance = ref<KisBalance | null>(null)
@@ -25,6 +29,8 @@ const audits = ref<KisOrderAudit[]>([])
 const quote = ref<KisQuote | null>(null)
 const quoteSymbol = ref('005930')
 const credentialMessage = ref('')
+const agentQuery = ref('현재 포트폴리오를 점검하고 유지/조정 필요성을 판단해줘.')
+const agentMessage = ref('')
 
 const credentialForm = reactive<KisCredentialRequest>({
   environment: 'PAPER',
@@ -43,7 +49,8 @@ const loading = reactive({
   balance: false,
   snapshots: false,
   audits: false,
-  quote: false
+  quote: false,
+  agent: false
 })
 
 const errors = reactive({
@@ -52,7 +59,8 @@ const errors = reactive({
   balance: '',
   snapshots: '',
   audits: '',
-  quote: ''
+  quote: '',
+  agent: ''
 })
 
 const latestSnapshot = computed(() => snapshots.value[0] ?? null)
@@ -241,6 +249,91 @@ async function loadQuote() {
   }
 }
 
+async function startAgentRun() {
+  errors.agent = ''
+  agentMessage.value = ''
+  loading.agent = true
+  try {
+    const portfolio = await currentAgentPortfolio()
+    const body: RunStartBody = {
+      query: agentQuery.value.trim() || '현재 포트폴리오를 점검해줘.',
+      portfolio,
+      knowledge_base: {
+        events: [],
+        documents: [],
+        source_paths: { source: 'frontend-dashboard' }
+      },
+      trigger: 'user_request',
+      depth: 'shallow',
+      deadline_seconds: 180,
+      approval_required: true,
+      enable_human_interrupts: true
+    }
+    await runStream.start(body)
+  } catch (e) {
+    errors.agent = errorMessage(e, '에이전트 실행을 시작하지 못했습니다')
+  } finally {
+    loading.agent = false
+  }
+}
+
+async function resumeAgent(approved: boolean, decision: 'APPROVE' | 'REJECT' | 'REVISE') {
+  errors.agent = ''
+  agentMessage.value = ''
+  try {
+    await runStream.resume({
+      approved,
+      decision,
+      option_index: decision === 'APPROVE' ? 0 : decision === 'REJECT' ? 1 : 2,
+      note: `frontend:${decision}`
+    })
+  } catch (e) {
+    errors.agent = errorMessage(e, '에이전트 실행을 재개하지 못했습니다')
+  }
+}
+
+async function currentAgentPortfolio() {
+  if (balance.value) {
+    return portfolioFromBalance(balance.value)
+  }
+  try {
+    const latest = await brokerApi.latestPortfolioSnapshot()
+    const parsed = JSON.parse(latest.data.snapshotJson) as KisBalance
+    return portfolioFromBalance(parsed)
+  } catch {
+    throw new Error('먼저 잔고를 동기화하거나 snapshot을 만들어야 합니다')
+  }
+}
+
+function portfolioFromBalance(source: KisBalance): Record<string, unknown> {
+  const totalValue = toNumber(source.summary.totalValuationAmount)
+    ?? toNumber(source.summary.netAssetAmount)
+    ?? source.holdings.reduce((sum, item) => sum + (toNumber(item.valuationAmount) ?? 0), 0)
+  const safeTotal = totalValue && totalValue > 0 ? totalValue : 1
+  return {
+    generated_at: new Date().toISOString(),
+    total_value_krw: totalValue,
+    cash_weight: Math.max(0, Math.min(1, (toNumber(source.summary.depositAmount) ?? 0) / safeTotal)),
+    holdings: source.holdings
+      .map((holding) => {
+        const valuation = toNumber(holding.valuationAmount) ?? 0
+        return {
+          ticker: holding.symbol,
+          company_name: holding.name || holding.symbol,
+          weight: Math.max(0, Math.min(1, valuation / safeTotal)),
+          aliases: [holding.symbol, holding.name].filter(Boolean),
+          shares: toNumber(holding.quantity),
+          last_price: toNumber(holding.currentPrice),
+          average_price: toNumber(holding.averagePrice),
+          market_value_krw: valuation,
+          unrealized_pnl_krw: toNumber(holding.profitLossAmount)
+        }
+      })
+      .filter((holding) => holding.ticker && (holding.weight > 0 || Number(holding.shares ?? 0) > 0)),
+    user_preferences: ['모의투자 기준', '무리한 회전율 회피', '리스크 우선']
+  }
+}
+
 function onLogout() {
   auth.logout()
   router.replace('/login')
@@ -340,6 +433,96 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
   if (statusValue === 'FAILED') return 'border-red-200 bg-red-50 text-red-700'
   return 'border-gray-200 bg-gray-50 text-gray-700'
 }
+
+function agentLabel(agentId: string | null | undefined) {
+  const labels: Record<string, string> = {
+    disclosure: '공시',
+    news: '뉴스',
+    report: '리포트',
+    profit: '수익',
+    cost: '비용',
+    risk: '리스크',
+    tax: '세금',
+    macro: '매크로',
+    sentiment: '심리',
+    execution: '실행',
+    esg: 'ESG',
+    liquidity: '유동성',
+    technical: '기술'
+  }
+  if (!agentId) return 'Judge'
+  return labels[agentId] ?? agentId
+}
+
+function debateTitle(event: RunEvent) {
+  switch (event.event) {
+    case 'judge_action':
+      return event.data.action === 'CALL_AGENT'
+        ? `${agentLabel(event.data.agent_id)} 호출`
+        : 'Judge 판단'
+    case 'agent_started':
+      return `${agentLabel(event.data.agent_id)} 분석 시작`
+    case 'agent_completed':
+      return `${agentLabel(event.data.agent_id)} 의견 제출`
+    case 'agent_failed':
+      return `${agentLabel(event.data.agent_id)} 실패`
+    case 'mediator_decision':
+      return 'Mediator 조정'
+    case 'consensus_updated':
+      return '합의 갱신'
+    case 'final_decision_draft':
+      return '최종 판단 초안'
+    default:
+      return event.event
+  }
+}
+
+function debateDetail(event: RunEvent) {
+  switch (event.event) {
+    case 'judge_action':
+      return event.data.reason || event.data.query || event.data.action
+    case 'agent_started':
+      return event.data.query || event.data.depth || ''
+    case 'agent_completed':
+      return event.data.reasoning || event.data.limits_acknowledged || event.data.opinion || ''
+    case 'agent_failed':
+      return event.data.error
+    case 'mediator_decision':
+      return event.data.rationale
+    case 'final_decision_draft':
+      return event.data.summary || event.data.reasoning || event.data.decision || ''
+    case 'consensus_updated':
+      return '도메인 의견과 충돌 지표를 다시 계산했습니다.'
+    default:
+      return ''
+  }
+}
+
+function debateMeta(event: RunEvent) {
+  if (event.event === 'agent_completed') {
+    const confidence = typeof event.data.confidence === 'number'
+      ? `${Math.round(event.data.confidence * 100)}%`
+      : null
+    return [event.data.layer, event.data.opinion, confidence].filter(Boolean).join(' · ')
+  }
+  if (event.event === 'judge_action') {
+    return [event.data.layer, event.data.depth, event.data.response_count !== undefined ? `${event.data.response_count} 의견` : null]
+      .filter(Boolean)
+      .join(' · ')
+  }
+  if (event.event === 'final_decision_draft') {
+    return [event.data.decision, event.data.urgency].filter(Boolean).join(' · ')
+  }
+  return ''
+}
+
+function debateToneClass(event: RunEvent) {
+  if (event.event === 'agent_failed') return 'border-red-200 bg-red-50'
+  if (event.event === 'final_decision_draft') return 'border-gray-900 bg-gray-50'
+  if (event.event === 'agent_completed') return 'border-emerald-200 bg-emerald-50'
+  if (event.event === 'agent_started') return 'border-blue-200 bg-blue-50'
+  return 'border-gray-200 bg-white'
+}
 </script>
 
 <template>
@@ -418,6 +601,119 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
             <p class="mt-1 text-sm font-semibold">
               {{ status?.symbolAllowListEnabled ? `${status?.allowedSymbolsCount ?? 0}개` : '전체' }}
             </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-5 rounded border border-gray-200 bg-white">
+        <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 class="text-base font-semibold">Agent Debate</h2>
+            <p class="mt-1 text-sm text-gray-500">
+              {{ runStream.currentThreadId ? `thread ${runStream.currentThreadId.slice(0, 8)}` : '대기 중' }}
+              <span class="ml-2 rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600">
+                {{ runStream.phase }}
+              </span>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="runStream.isStreaming"
+              type="button"
+              class="h-9 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50"
+              @click="runStream.cancel"
+            >
+              중단
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded bg-gray-900 px-3 text-sm text-white hover:bg-gray-800 disabled:opacity-50"
+              :disabled="loading.agent || runStream.isStreaming"
+              @click="startAgentRun"
+            >
+              판단 시작
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 p-4 lg:grid-cols-[minmax(260px,360px)_minmax(0,1fr)]">
+          <div class="space-y-3">
+            <label class="block">
+              <span class="text-xs text-gray-500">질문</span>
+              <textarea
+                v-model="agentQuery"
+                rows="5"
+                class="mt-1 w-full resize-none rounded border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none"
+              />
+            </label>
+            <p v-if="errors.agent" class="text-sm text-red-600">{{ errors.agent }}</p>
+            <div v-if="runStream.pendingInterrupt" class="rounded border border-amber-200 bg-amber-50 p-3">
+              <p class="text-sm font-medium text-amber-900">사용자 확인 필요</p>
+              <p class="mt-1 text-sm text-amber-800">
+                {{ runStream.pendingInterrupt.message || runStream.pendingInterrupt.decision || '최종 결정 적용 전 확인이 필요합니다.' }}
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="h-8 rounded bg-gray-900 px-3 text-xs text-white hover:bg-gray-800"
+                  @click="resumeAgent(true, 'APPROVE')"
+                >
+                  승인
+                </button>
+                <button
+                  type="button"
+                  class="h-8 rounded border border-gray-300 bg-white px-3 text-xs text-gray-700 hover:bg-gray-50"
+                  @click="resumeAgent(false, 'REJECT')"
+                >
+                  거절
+                </button>
+                <button
+                  type="button"
+                  class="h-8 rounded border border-gray-300 bg-white px-3 text-xs text-gray-700 hover:bg-gray-50"
+                  @click="resumeAgent(false, 'REVISE')"
+                >
+                  수정 요청
+                </button>
+              </div>
+            </div>
+            <div v-if="runStream.completion" class="rounded border border-gray-200 bg-gray-50 p-3">
+              <p class="text-xs text-gray-500">결과</p>
+              <p class="mt-1 text-sm font-semibold">
+                {{ runStream.completion.decision || '-' }}
+                <span class="ml-2 text-gray-500">{{ runStream.completion.branch }}</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="min-h-[260px] rounded border border-gray-200 bg-gray-50 p-3">
+            <div v-if="!runStream.debateEvents.length" class="flex h-full min-h-[220px] items-center justify-center text-sm text-gray-500">
+              판단을 시작하면 Judge 호출, 에이전트 의견, 합의 흐름이 여기에 쌓입니다.
+            </div>
+            <ol v-else class="space-y-3">
+              <li
+                v-for="(event, index) in runStream.debateEvents"
+                :key="`${event.event}-${index}`"
+                class="rounded border p-3"
+                :class="debateToneClass(event)"
+              >
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <p class="text-sm font-semibold">{{ debateTitle(event) }}</p>
+                  <p v-if="debateMeta(event)" class="text-xs text-gray-500">{{ debateMeta(event) }}</p>
+                </div>
+                <p v-if="debateDetail(event)" class="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
+                  {{ debateDetail(event) }}
+                </p>
+                <div v-if="event.event === 'agent_completed' && event.data.focus_tickers?.length" class="mt-2 flex flex-wrap gap-1">
+                  <span
+                    v-for="ticker in event.data.focus_tickers"
+                    :key="ticker"
+                    class="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600"
+                  >
+                    {{ ticker }}
+                  </span>
+                </div>
+              </li>
+            </ol>
           </div>
         </div>
       </section>

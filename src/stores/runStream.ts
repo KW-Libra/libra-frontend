@@ -33,6 +33,19 @@ export const useRunStreamStore = defineStore('runStream', () => {
   let activeRequestId = 0
 
   const lastEvent = computed(() => events.value.at(-1) ?? null)
+  const debateEvents = computed(() =>
+    events.value.filter((event) =>
+      [
+        'judge_action',
+        'agent_started',
+        'agent_completed',
+        'agent_failed',
+        'mediator_decision',
+        'consensus_updated',
+        'final_decision_draft'
+      ].includes(event.event)
+    )
+  )
   const isStreaming = computed(() => phase.value === 'connecting' || phase.value === 'streaming')
   const isAwaitingResume = computed(() => phase.value === 'interrupted' && !!pendingInterrupt.value)
   const hasTerminalEvent = computed(() =>
@@ -112,6 +125,13 @@ export const useRunStreamStore = defineStore('runStream', () => {
         break
       case 'node_started':
       case 'node_completed':
+      case 'judge_action':
+      case 'agent_started':
+      case 'agent_completed':
+      case 'agent_failed':
+      case 'mediator_decision':
+      case 'consensus_updated':
+      case 'final_decision_draft':
         break
     }
   }
@@ -197,6 +217,7 @@ export const useRunStreamStore = defineStore('runStream', () => {
     completion,
     errorMessage,
     lastEvent,
+    debateEvents,
     isStreaming,
     isAwaitingResume,
     hasTerminalEvent,

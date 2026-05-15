@@ -22,17 +22,25 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 export interface RunStartBody {
   query: string
   portfolio?: Record<string, unknown>
+  knowledge_base?: Record<string, unknown>
+  knowledge_sources?: Record<string, unknown>
   trigger?: 'pull' | 'push' | 'user_request'
+  depth?: 'shallow' | 'medium' | 'deep'
+  deadline_seconds?: number
   thread_id?: string
   approval_required?: boolean
+  enable_human_interrupts?: boolean
 }
 
 export interface ResumeBody {
   approved: boolean
   decision?: 'APPROVE' | 'REJECT' | 'REVISE' | 'DEFER'
+  interrupt_id?: string | null
   option_index?: number
+  override_decision?: string
   override_plan?: Record<string, number>
   note?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface SseHandlers {
