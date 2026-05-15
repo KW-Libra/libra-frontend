@@ -20,7 +20,20 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: () => import('@/pages/DashboardPage.vue')
+      component: () => import('@/pages/DashboardPage.vue'),
+      meta: { public: true}
+    },
+    {
+      path: '/run/:threadId',
+      name: 'run',
+      component: () => import('@/pages/RunPage.vue'),
+      meta: { public: true }
+    },
+    {
+      path: '/run/:threadId/result',
+      name: 'run-result',
+      component: () => import('@/pages/RunResultPage.vue'),
+      meta: { public: true }
     },
     {
       path: '/design/run-screen',
@@ -39,9 +52,9 @@ router.beforeEach((to) => {
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (to.meta.public && auth.isAuthenticated) {
-    return { name: 'dashboard' }
-  }
+  //if (to.meta.public && auth.isAuthenticated) {
+  //  return { name: 'dashboard' }
+  //}
 })
 
 export default router
