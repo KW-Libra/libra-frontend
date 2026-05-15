@@ -265,6 +265,9 @@ function processVetoOption() {
     return
   }
 }
+function goReport() {
+  router.push(`/run/${threadId}/report`)
+}
 
 function cancelDecision() {
   saveDecisionToHistory('취소됨', 'cancelled')
@@ -728,6 +731,7 @@ function cancelDecision() {
             시스템은 결정을 대신하지 않습니다.
           </div>
           <div class="flex gap-2">
+            <button @click="goReport" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">상세 보고서</button>
             <button @click="cancelDecision" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">취소</button>
             <button
               @click="approveOption"
@@ -783,6 +787,8 @@ function cancelDecision() {
             거절하면 다른 결정 옵션을 검토할 수 있습니다.
           </div>
           <div class="flex gap-2">
+            <button @click="goReport" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">상세 보고서</button>
+            
             <button @click="cancelDecision" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">거절</button>
             <button @click="approveAutoRebalance" class="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition">자동 리밸런싱 승인</button>
           </div>
@@ -878,6 +884,8 @@ function cancelDecision() {
             <span class="font-medium text-gray-700">약한 합의</span>는 한 방향으로 기울지만 확신이 낮은 경우 — 시스템이 보수적으로 절반만 반영합니다.
           </div>
           <div class="flex gap-2">
+            <button @click="goReport" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">상세 보고서</button>
+            
             <button @click="cancelDecision" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">거절</button>
             <button @click="approveConservative" class="px-4 py-2 text-sm font-medium bg-amber-600 text-white rounded-md hover:bg-amber-700 transition">보수적 권고 승인</button>
           </div>
@@ -923,6 +931,8 @@ function cancelDecision() {
             정책 변경에는 사용자의 명시 동의가 필요합니다.
           </div>
           <div class="flex gap-2">
+            <button @click="goReport" class="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition">상세 보고서</button>
+            
             <button
               @click="processVetoOption"
               class="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-md hover:bg-black transition disabled:opacity-40 disabled:cursor-not-allowed"

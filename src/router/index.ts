@@ -36,6 +36,12 @@ const router = createRouter({
       meta: { public: true }
     },
     {
+      path: '/run/:threadId/report',
+      name: 'run-report',
+      component: () => import('@/pages/RunReportPage.vue'),
+      meta: { public: true }
+    },
+    {
       path: '/design/run-screen',
       name: 'design-run-screen',
       component: () => import('@/pages/design/RunScreenDesign.vue'),
