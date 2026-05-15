@@ -33,6 +33,7 @@ export const useRunStreamStore = defineStore('runStream', () => {
   let activeRequestId = 0
 
   const lastEvent = computed(() => events.value.at(-1) ?? null)
+  const timelineEvents = computed(() => events.value)
   const debateEvents = computed(() =>
     events.value.filter((event) =>
       [
@@ -217,6 +218,7 @@ export const useRunStreamStore = defineStore('runStream', () => {
     completion,
     errorMessage,
     lastEvent,
+    timelineEvents,
     debateEvents,
     isStreaming,
     isAwaitingResume,

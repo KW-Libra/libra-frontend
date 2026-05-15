@@ -454,8 +454,26 @@ function agentLabel(agentId: string | null | undefined) {
   return labels[agentId] ?? agentId
 }
 
+function nodeLabel(node: string | null | undefined) {
+  const labels: Record<string, string> = {
+    compliance_before: '사전 컴플라이언스',
+    round1: '1차 에이전트 의견',
+    mediator: 'Mediator 조정',
+    final_judge: '최종 Judge',
+    human_review: '사용자 확인'
+  }
+  if (!node) return '노드'
+  return labels[node] ?? node
+}
+
 function debateTitle(event: RunEvent) {
   switch (event.event) {
+    case 'run_started':
+      return '판단 시작'
+    case 'node_started':
+      return `${nodeLabel(event.data.node)} 시작`
+    case 'node_completed':
+      return `${nodeLabel(event.data.node)} 완료`
     case 'judge_action':
       return event.data.action === 'CALL_AGENT'
         ? `${agentLabel(event.data.agent_id)} 호출`
@@ -472,13 +490,29 @@ function debateTitle(event: RunEvent) {
       return '합의 갱신'
     case 'final_decision_draft':
       return '최종 판단 초안'
+    case 'interrupt_required':
+      return '사용자 확인 필요'
+    case 'resume_received':
+      return '사용자 응답 수신'
+    case 'resume_ignored':
+      return '재개 무시'
+    case 'run_completed':
+      return '판단 완료'
+    case 'run_failed':
+      return '판단 실패'
     default:
-      return event.event
+      return '이벤트'
   }
 }
 
 function debateDetail(event: RunEvent) {
   switch (event.event) {
+    case 'run_started':
+      return event.data.query
+    case 'node_started':
+      return `${nodeLabel(event.data.node)} 단계에 진입했습니다.`
+    case 'node_completed':
+      return `${nodeLabel(event.data.node)} 단계가 끝났습니다.`
     case 'judge_action':
       return event.data.reason || event.data.query || event.data.action
     case 'agent_started':
@@ -493,12 +527,28 @@ function debateDetail(event: RunEvent) {
       return event.data.summary || event.data.reasoning || event.data.decision || ''
     case 'consensus_updated':
       return '도메인 의견과 충돌 지표를 다시 계산했습니다.'
+    case 'interrupt_required':
+      return event.data.message || event.data.reason || event.data.decision || ''
+    case 'resume_received':
+      return event.data.approved ? '승인 응답을 agent에 전달했습니다.' : '거절/수정 응답을 agent에 전달했습니다.'
+    case 'resume_ignored':
+      return event.data.reason
+    case 'run_completed':
+      return event.data.approval_response?.note || event.data.run_status
+    case 'run_failed':
+      return event.data.error
     default:
       return ''
   }
 }
 
 function debateMeta(event: RunEvent) {
+  if (event.event === 'run_started') {
+    return [event.data.trigger, event.data.approval_required ? '사용자 확인 ON' : null].filter(Boolean).join(' · ')
+  }
+  if (event.event === 'node_started' || event.event === 'node_completed') {
+    return event.data.node
+  }
   if (event.event === 'agent_completed') {
     const confidence = typeof event.data.confidence === 'number'
       ? `${Math.round(event.data.confidence * 100)}%`
@@ -513,11 +563,26 @@ function debateMeta(event: RunEvent) {
   if (event.event === 'final_decision_draft') {
     return [event.data.decision, event.data.urgency].filter(Boolean).join(' · ')
   }
+  if (event.event === 'interrupt_required') {
+    return [event.data.decision, event.data.branch].filter(Boolean).join(' · ')
+  }
+  if (event.event === 'resume_received') {
+    return event.data.option_index !== undefined && event.data.option_index !== null
+      ? `option ${event.data.option_index}`
+      : ''
+  }
+  if (event.event === 'run_completed') {
+    return [event.data.decision, event.data.branch, event.data.run_status].filter(Boolean).join(' · ')
+  }
   return ''
 }
 
 function debateToneClass(event: RunEvent) {
-  if (event.event === 'agent_failed') return 'border-red-200 bg-red-50'
+  if (event.event === 'run_failed' || event.event === 'agent_failed') return 'border-red-200 bg-red-50'
+  if (event.event === 'interrupt_required') return 'border-amber-200 bg-amber-50'
+  if (event.event === 'run_completed') return 'border-emerald-200 bg-emerald-50'
+  if (event.event === 'node_completed') return 'border-gray-200 bg-white'
+  if (event.event === 'node_started' || event.event === 'run_started' || event.event === 'resume_received') return 'border-blue-200 bg-blue-50'
   if (event.event === 'final_decision_draft') return 'border-gray-900 bg-gray-50'
   if (event.event === 'agent_completed') return 'border-emerald-200 bg-emerald-50'
   if (event.event === 'agent_started') return 'border-blue-200 bg-blue-50'
@@ -686,12 +751,12 @@ function debateToneClass(event: RunEvent) {
           </div>
 
           <div class="min-h-[260px] rounded border border-gray-200 bg-gray-50 p-3">
-            <div v-if="!runStream.debateEvents.length" class="flex h-full min-h-[220px] items-center justify-center text-sm text-gray-500">
+            <div v-if="!runStream.timelineEvents.length" class="flex h-full min-h-[220px] items-center justify-center text-sm text-gray-500">
               판단을 시작하면 Judge 호출, 에이전트 의견, 합의 흐름이 여기에 쌓입니다.
             </div>
             <ol v-else class="space-y-3">
               <li
-                v-for="(event, index) in runStream.debateEvents"
+                v-for="(event, index) in runStream.timelineEvents"
                 :key="`${event.event}-${index}`"
                 class="rounded border p-3"
                 :class="debateToneClass(event)"
