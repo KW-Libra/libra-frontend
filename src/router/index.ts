@@ -22,6 +22,12 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/pages/DashboardPage.vue')
     },
+    {
+      path: '/design/run-screen',
+      name: 'design-run-screen',
+      component: () => import('@/pages/design/RunScreenDesign.vue'),
+      meta: { public: true }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
   ]
 })
