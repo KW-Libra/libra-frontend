@@ -46,7 +46,7 @@ npm run dev
 |---|---|---|
 | `/login` | public | 이메일/비번 → JWT. demo 계정 (`demo@libra.local` / `demo1234`) prefill |
 | `/signup` | public | 회원가입 (8자+ 비번) |
-| `/dashboard` | required | KIS 상태, 시세 조회, portfolio snapshot, 주문 audit |
+| `/dashboard` | required | KIS 상태, 주문 안전장치, 시세 조회, portfolio snapshot, 주문 audit |
 
 ## 폴더 구조
 

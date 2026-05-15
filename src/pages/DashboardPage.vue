@@ -309,7 +309,7 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
           <p v-if="errors.status" class="mt-3 text-sm text-red-600">{{ errors.status }}</p>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 rounded border border-gray-200 bg-white p-4 lg:col-span-3 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 rounded border border-gray-200 bg-white p-4 lg:col-span-3 sm:grid-cols-3 xl:grid-cols-7">
           <div>
             <p class="text-xs text-gray-500">REST</p>
             <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.restConfigured) }}</p>
@@ -325,6 +325,20 @@ function statusPillClass(statusValue: KisOrderAudit['status']) {
           <div>
             <p class="text-xs text-gray-500">WebSocket</p>
             <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.webSocketConfigured) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">최대수량</p>
+            <p class="mt-1 text-sm font-semibold">{{ status?.maxOrderQuantity ?? '-' }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">최대금액</p>
+            <p class="mt-1 text-sm font-semibold">{{ formatMoney(status?.maxOrderAmount) }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500">허용종목</p>
+            <p class="mt-1 text-sm font-semibold">
+              {{ status?.symbolAllowListEnabled ? `${status?.allowedSymbolsCount ?? 0}개` : '전체' }}
+            </p>
           </div>
         </div>
       </section>

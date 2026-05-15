@@ -40,6 +40,10 @@ export interface KisStatus {
   restConfigured: boolean
   accountConfigured: boolean
   webSocketConfigured: boolean
+  maxOrderQuantity: number
+  maxOrderAmount: DecimalValue
+  symbolAllowListEnabled: boolean
+  allowedSymbolsCount: number
 }
 
 export interface KisQuote {
@@ -128,6 +132,7 @@ export interface KisOrderAudit {
   orderDivision: string
   exchangeId: string
   tradingEnabled: boolean
+  idempotencyKey: string | null
   brokerOrderNo: string | null
   brokerMessage: string | null
   errorCode: string | null
