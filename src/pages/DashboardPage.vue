@@ -260,7 +260,7 @@ async function startAgentRun() {
       portfolio,
       trigger: 'user_request',
       depth: 'shallow',
-      deadline_seconds: 180,
+      deadline_seconds: 300,
       approval_required: true,
       enable_human_interrupts: true
     }
