@@ -258,11 +258,6 @@ async function startAgentRun() {
     const body: RunStartBody = {
       query: agentQuery.value.trim() || '현재 포트폴리오를 점검해줘.',
       portfolio,
-      knowledge_base: {
-        events: [],
-        documents: [],
-        source_paths: { source: 'frontend-dashboard' }
-      },
       trigger: 'user_request',
       depth: 'shallow',
       deadline_seconds: 180,
