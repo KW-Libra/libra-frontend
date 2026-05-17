@@ -672,6 +672,12 @@ function formatUnknown(value: unknown) {
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <RouterLink
+            to="/design/run-screen"
+            class="h-9 rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            디자인 시안
+          </RouterLink>
           <button
             type="button"
             class="h-9 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
