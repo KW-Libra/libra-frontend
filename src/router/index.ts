@@ -22,30 +22,6 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/pages/DashboardPage.vue')
     },
-    {
-      path: '/run/:threadId',
-      name: 'run',
-      component: () => import('@/pages/RunPage.vue'),
-      meta: { public: true }
-    },
-    {
-      path: '/run/:threadId/result',
-      name: 'run-result',
-      component: () => import('@/pages/RunResultPage.vue'),
-      meta: { public: true }
-    },
-    {
-      path: '/run/:threadId/report',
-      name: 'run-report',
-      component: () => import('@/pages/RunReportPage.vue'),
-      meta: { public: true }
-    },
-    {
-      path: '/design/run-screen',
-      name: 'design-run-screen',
-      component: () => import('@/pages/design/RunScreenDesign.vue'),
-      meta: { public: true }
-    },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
   ]
 })
