@@ -17,6 +17,7 @@ export type RunEventName =
   | 'mediator_decision'
   | 'consensus_updated'
   | 'final_decision_draft'
+  | 'human_review_skipped'
   | 'interrupt_required'
   | 'resume_received'
   | 'resume_ignored'
@@ -221,6 +222,17 @@ export type RunEvent =
         skipped_agents?: string[]
         requires_approval?: boolean
         trades?: unknown[]
+      }
+    }
+  | {
+      event: 'human_review_skipped'
+      data: {
+        reason: 'no_action_required' | (string & {})
+        message: string
+        decision?: string | null
+        branch?: string | null
+        action_required?: boolean
+        requires_approval?: boolean
       }
     }
   | {

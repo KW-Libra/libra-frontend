@@ -43,7 +43,8 @@ export const useRunStreamStore = defineStore('runStream', () => {
         'agent_failed',
         'mediator_decision',
         'consensus_updated',
-        'final_decision_draft'
+        'final_decision_draft',
+        'human_review_skipped'
       ].includes(event.event)
     )
   )
@@ -133,6 +134,7 @@ export const useRunStreamStore = defineStore('runStream', () => {
       case 'mediator_decision':
       case 'consensus_updated':
       case 'final_decision_draft':
+      case 'human_review_skipped':
         break
     }
   }

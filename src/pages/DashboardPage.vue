@@ -511,6 +511,8 @@ function debateTitle(event: RunEvent) {
     case 'llm_error':
       return `${agentLabel(event.data.actor)} LLM 실패`
     case 'llm_skipped':
+      if (event.data.phase === 'core_routing') return 'Core fast-path 적용'
+      if (event.data.phase === 'final_decision_final') return 'Final decision fast-path 적용'
       return `${agentLabel(event.data.actor)} LLM 생략`
     case 'mediator_decision':
       return 'Mediator 조정'
@@ -518,6 +520,8 @@ function debateTitle(event: RunEvent) {
       return '합의 갱신'
     case 'final_decision_draft':
       return '최종 판단 초안'
+    case 'human_review_skipped':
+      return '사용자 확인 생략'
     case 'interrupt_required':
       return '사용자 확인 필요'
     case 'resume_received':
@@ -563,6 +567,8 @@ function debateDetail(event: RunEvent) {
       return event.data.rationale
     case 'final_decision_draft':
       return event.data.summary || event.data.reasoning || event.data.decision || ''
+    case 'human_review_skipped':
+      return event.data.message || event.data.reason || ''
     case 'consensus_updated':
       return '도메인 의견과 충돌 지표를 다시 계산했습니다.'
     case 'interrupt_required':
@@ -601,6 +607,9 @@ function debateMeta(event: RunEvent) {
   if (event.event === 'final_decision_draft') {
     return [event.data.decision, event.data.urgency].filter(Boolean).join(' · ')
   }
+  if (event.event === 'human_review_skipped') {
+    return [event.data.decision, event.data.branch].filter(Boolean).join(' · ')
+  }
   if (event.event === 'tool_observation') {
     return phaseLabel(event.data.phase)
   }
@@ -628,6 +637,7 @@ function debateToneClass(event: RunEvent) {
   if (event.event === 'run_failed' || event.event === 'agent_failed' || event.event === 'llm_error') return 'border-red-200 bg-red-50'
   if (event.event === 'interrupt_required') return 'border-amber-200 bg-amber-50'
   if (event.event === 'run_completed') return 'border-emerald-200 bg-emerald-50'
+  if (event.event === 'human_review_skipped') return 'border-gray-200 bg-gray-50'
   if (event.event === 'llm_prompt') return 'border-violet-200 bg-violet-50'
   if (event.event === 'llm_response') return 'border-cyan-200 bg-cyan-50'
   if (event.event === 'llm_skipped') return 'border-gray-200 bg-gray-100'
