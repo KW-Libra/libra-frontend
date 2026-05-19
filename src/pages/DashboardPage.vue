@@ -846,6 +846,12 @@ function formatUnknown(value: unknown) {
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <RouterLink
+            to="/backtests/public-rss-3y"
+            class="inline-flex h-9 items-center rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            백테스트
+          </RouterLink>
           <button
             type="button"
             class="h-9 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
