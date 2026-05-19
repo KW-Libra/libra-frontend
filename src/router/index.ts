@@ -42,6 +42,18 @@ const router = createRouter({
       meta: { public: true }
     },
     {
+      path: '/portfolio/setup',
+      name: 'portfolio-setup',
+      component: () => import('@/pages/PortfolioSetupPage.vue'),
+      meta: { public: true }
+    },
+    {
+      path: '/portfolio/ips',
+      name: 'portfolio-ips',
+      component: () => import('@/pages/PortfolioIpsPage.vue'),
+      meta: { public: true }
+    },
+    {
       path: '/design/run-screen',
       name: 'design-run-screen',
       component: () => import('@/pages/design/RunScreenDesign.vue'),

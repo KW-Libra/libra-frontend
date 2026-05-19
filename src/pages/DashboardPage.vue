@@ -37,6 +37,46 @@ interface DecisionRecord {
 }
 const decisions = ref<DecisionRecord[]>([])
 
+interface StoredHolding {
+  ticker: string
+  name: string
+  weight: number
+}
+
+// 설정 페이지는 등락률을 수집하지 않으므로 ticker 기반 결정적 값으로 생성
+// (-2.0% ~ +2.0%, 새로고침해도 동일)
+function pseudoChange(ticker: string): number {
+  let h = 0
+  for (let i = 0; i < ticker.length; i++) {
+    h = (h * 31 + ticker.charCodeAt(i)) >>> 0
+  }
+  return Math.round(((h % 401) / 100 - 2) * 10) / 10
+}
+
+// /portfolio/setup 에서 저장한 사용자 정의 인덱스를 대시보드 포트폴리오에 반영.
+// 이름·자산배분만 실데이터, 평가액·변동성은 미수집이라 시안 mock 유지.
+function loadCustomIndex() {
+  const stored = sessionStorage.getItem('libra_custom_index')
+  if (!stored) return
+  try {
+    const parsed = JSON.parse(stored)
+    const holdings: StoredHolding[] = Array.isArray(parsed.holdings) ? parsed.holdings : []
+    if (holdings.length === 0) return
+    if (typeof parsed.name === 'string' && parsed.name.trim()) {
+      portfolio.value.name = parsed.name.trim()
+    }
+    portfolio.value.allocations = holdings.map((h) => ({
+      ticker: h.ticker,
+      name: h.name || h.ticker,
+      weight: h.weight,
+      change: pseudoChange(h.ticker),
+    }))
+    portfolio.value.lastUpdated = new Date().toISOString()
+  } catch {
+    // 무시
+  }
+}
+
 const selectedScenarioId = ref<string>('fomc')
 
 onMounted(async () => {
@@ -46,11 +86,16 @@ onMounted(async () => {
     // 시안 단계 무시
   }
   decisions.value = JSON.parse(sessionStorage.getItem('libra_decisions') || '[]')
+  loadCustomIndex()
 })
 
 function onLogout() {
   auth.logout()
   router.replace('/login')
+}
+
+function goToPortfolioSetup() {
+  router.push('/portfolio/setup')
 }
 
 function startRebalancingReview() {
@@ -123,9 +168,21 @@ const selectedScenario = computed(() =>
     </header>
 
     <main class="max-w-6xl mx-auto px-8 py-10">
-      <div class="mb-8">
-        <h1 class="text-2xl font-medium tracking-tight mb-1">대시보드</h1>
-        <p class="text-sm text-gray-600">포트폴리오 현황 및 리밸런싱 검토</p>
+      <div class="mb-8 flex items-start justify-between">
+        <div>
+          <h1 class="text-2xl font-medium tracking-tight mb-1">대시보드</h1>
+          <p class="text-sm text-gray-600">포트폴리오 현황 및 리밸런싱 검토</p>
+        </div>
+        <button
+          @click="goToPortfolioSetup"
+          class="flex items-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-3.5 py-2 hover:border-gray-900 hover:text-gray-900 transition"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>포트폴리오 설정</span>
+        </button>
       </div>
 
       <div
@@ -196,7 +253,7 @@ const selectedScenario = computed(() =>
                   <div class="w-24">
                     <div class="flex items-center gap-2">
                       <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-gray-700" :style="{ width: `${alloc.weight * 2}%` }"></div>
+                        <div class="h-full bg-gray-700" :style="{ width: `${Math.min(100, alloc.weight * 2)}%` }"></div>
                       </div>
                       <span class="text-xs font-mono text-gray-700 w-10 text-right">{{ alloc.weight }}%</span>
                     </div>
