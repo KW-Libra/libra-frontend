@@ -22,6 +22,12 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/pages/DashboardPage.vue')
     },
+    {
+      path: '/backtests/public-rss-3y',
+      name: 'backtest-public-rss-3y',
+      component: () => import('@/pages/BacktestPage.vue'),
+      meta: { public: true }
+    },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
   ]
 })
