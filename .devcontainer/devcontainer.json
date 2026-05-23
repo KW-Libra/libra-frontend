@@ -1,0 +1,59 @@
+{
+  "name": "Libra Full Stack",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "21",
+      "installGradle": true,
+      "gradleVersion": "8.14.3"
+    },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.12" },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+
+  "forwardPorts": [5173, 8080, 8000, 5432],
+  "portsAttributes": {
+    "5173": { "label": "Frontend (Vite)",   "onAutoForward": "openPreview" },
+    "8080": { "label": "Backend (Spring)",  "onAutoForward": "silent" },
+    "8000": { "label": "Agent (FastAPI)",   "onAutoForward": "silent" },
+    "5432": { "label": "Postgres",          "onAutoForward": "ignore" }
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/root/.local/bin:/home/vscode/.local/bin"
+  },
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Vue.volar",
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "redhat.vscode-yaml"
+      ]
+    },
+    "codespaces": {
+      "repositories": {
+        "KW-Libra/libra-backend": { "permissions": { "contents": "read" } },
+        "KW-Libra/libra-agent":   { "permissions": { "contents": "read" } },
+        "KW-Libra/libra-ingest":  { "permissions": { "contents": "read" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Libra: Agent (FastAPI)",
+      "type": "shell",
+      "command": "uv run uvicorn libra_agent.main:app --host 0.0.0.0 --port 8000 --reload",
+      "options": { "cwd": "${workspaceFolder}/../libra-agent" },
+      "isBackground": true,
+      "presentation": { "group": "libra", "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Libra: Backend (Spring)",
+      "type": "shell",
+      "command": "./gradlew bootRun",
+      "options": { "cwd": "${workspaceFolder}/../libra-backend" },
+      "isBackground": true,
+      "presentation": { "group": "libra", "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Libra: Frontend (Vite)",
+      "type": "shell",
+      "command": "npm run dev -- --host 0.0.0.0",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "group": "libra", "panel": "dedicated", "reveal": "always" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Libra: Run All",
+      "dependsOn": [
+        "Libra: Agent (FastAPI)",
+        "Libra: Backend (Spring)",
+        "Libra: Frontend (Vite)"
+      ],
+      "dependsOrder": "parallel",
+      "presentation": { "group": "libra" },
+      "problemMatcher": []
+    }
+  ]
+}
