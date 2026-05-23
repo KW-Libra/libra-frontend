@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Libra · 천칭 목업 v2</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+  :root {
+    /* === Toss-style neutrals === */
+    --bg: #F2F4F6;
+    --surface: #FFFFFF;
+    --surface-sub: #F9FAFB;
+    --border: #E5E8EB;
+    --border-strong: #D1D6DB;
+    --text-primary: #191F28;
+    --text-secondary: #4E5968;
+    --text-tertiary: #8B95A1;
+    /* AGENTS side — Toss Blue (keeps legacy --purple-* names so all rules still resolve) */
+    --purple-50: #E8F3FF; --purple-200: #C9E2FF; --purple-400: #4593FC;
+    --purple-600: #3182F6; --purple-800: #1B64DA; --purple-900: #1957C2;
+    /* JURY side — Toss Mint */
+    --teal-50: #E7F9F3; --teal-200: #ABEFD6; --teal-400: #2AC1A4;
+    --teal-600: #00B98C; --teal-800: #02856B; --teal-900: #04634F;
+    /* Accent — Toss amber/orange */
+    --amber-200: #FFD666; --amber-600: #FF9500; --amber-800: #C2410C;
+    --warning-bg: #FFF4E6; --warning-fg: #E08600;
+    --success-bg: #E7F9F3; --success-fg: #02A37D;
+    --info-bg: #E8F3FF; --info-fg: #3182F6; --info-border: #3182F6;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04);
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'SF Mono', Menlo, Monaco, 'Cascadia Code', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 32px 16px;
+    background: var(--bg);
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+  }
+
+  /* === Header === */
+  .head {
+    margin-bottom: 24px;
+  }
+  .head__top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .pill {
+    padding: 3px 10px;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--success-bg);
+    color: var(--success-fg);
+  }
+  .head__meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .head h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  .head__sub {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+  .head__sub code {
+    font-family: var(--font-mono);
+    color: var(--warning-fg);
+  }
+
+  /* === Scale Hero === */
+  .hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px 24px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-card);
+  }
+  .hero__title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .hero__title-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    letter-spacing: 1px;
+  }
+  .hero__angle {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--warning-fg);
+    background: var(--warning-bg);
+    padding: 3px 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .scale-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 8px 0 12px;
+  }
+  .scale-svg {
+    width: 340px;
+    height: 280px;
+  }
+  /* spring with a touch of overshoot — reads like a balance settling */
+  .scale-arm {
+    transform-origin: 120px 70px;
+    transition: transform 0.85s cubic-bezier(0.18, 0.9, 0.32, 1.22);
+    will-change: transform;
+  }
+  /* pans counter-rotate so they always hang vertically (gravity) */
+  .scale-pan {
+    transition: transform 0.85s cubic-bezier(0.18, 0.9, 0.32, 1.22);
+    will-change: transform;
+  }
+  .scale-pan--left  { transform-origin: 20px 71px; }
+  .scale-pan--right { transform-origin: 220px 71px; }
+  /* gentle perpetual sway so the balance feels alive */
+  @media (prefers-reduced-motion: no-preference) {
+    .scale-sway { animation: scaleSway 6s ease-in-out infinite; transform-origin: 120px 70px; }
+  }
+  @keyframes scaleSway {
+    0%, 100% { transform: rotate(-0.45deg); }
+    50%      { transform: rotate(0.45deg); }
+  }
+
+  /* === Score readout === */
+  .readout {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 0.5px solid var(--border);
+  }
+  .readout__item {
+    text-align: center;
+  }
+  .readout__label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    letter-spacing: 0.6px;
+    margin-bottom: 4px;
+  }
+  .readout__value {
+    font-size: 28px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    line-height: 1.1;
+  }
+  .readout__value--sub {
+    font-size: 16px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    margin-top: 2px;
+  }
+  .badge--strong { background: var(--teal-50); color: var(--teal-800); }
+  .badge--moderate { background: var(--info-bg); color: var(--info-fg); }
+  .badge--weak { background: var(--warning-bg); color: var(--warning-fg); }
+  .lean {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .lean strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  /* === Slider === */
+  .slider-section {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--surface-sub);
+    border-radius: var(--radius-md);
+  }
+  .slider-section__label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+  .slider-section__hint {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-style: italic;
+  }
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 24px;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(to right, var(--warning-bg) 0%, var(--info-bg) 50%, var(--teal-50) 100%);
+    border-radius: 2px;
+  }
+  input[type=range]::-moz-range-track {
+    height: 4px;
+    background: var(--info-bg);
+    border-radius: 2px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--purple-600);
+    box-shadow: 0 1px 4px rgba(49,130,246,0.35);
+    cursor: pointer;
+    margin-top: -7px;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--purple-600);
+    box-shadow: 0 1px 4px rgba(49,130,246,0.35);
+    cursor: pointer;
+  }
+  .slider-marks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    margin-top: 4px;
+  }
+
+  /* === Two-col panels === */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-card);
+  }
+  .panel__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .panel__head--right {
+    justify-content: flex-end;
+  }
+  .panel__title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.8px;
+  }
+  .panel--agents .panel__title { color: var(--purple-800); }
+  .panel--jury .panel__title { color: var(--teal-800); }
+  .panel--agents i { color: var(--purple-800); font-size: 18px; }
+  .panel--jury i { color: var(--teal-800); font-size: 18px; }
+  .panel__n {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+  }
+  .panel--jury .panel__n { margin-left: 0; margin-right: auto; }
+
+  .agent-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 50px;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 10px;
+    background: var(--purple-50);
+    border-radius: var(--radius-md);
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .agent-row--master {
+    background: var(--purple-200);
+    border: 0.5px solid var(--purple-600);
+  }
+  .agent-row__name { color: var(--purple-800); font-weight: 500; }
+  .agent-row--master .agent-row__name { color: var(--purple-900); }
+  .agent-row__name i { font-size: 11px; margin-right: 2px; }
+  .agent-row__bar {
+    height: 4px;
+    background: rgba(60, 52, 137, 0.15);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .agent-row__bar-fill {
+    height: 100%;
+    background: var(--purple-600);
+  }
+  .agent-row--master .agent-row__bar-fill { background: var(--purple-900); }
+  .agent-row__val {
+    color: var(--purple-900);
+    font-family: var(--font-mono);
+    text-align: right;
+  }
+  .agent-row--master .agent-row__val { font-weight: 500; }
+
+  .panel__footer {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .panel__footer i {
+    font-size: 11px;
+    margin-right: 3px;
+    color: var(--text-tertiary);
+  }
+
+  /* === Jury panel === */
+  .stack-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .stack-bar__seg--inc { background: var(--teal-600); }
+  .stack-bar__seg--hold { background: #B0B8C1; }
+  .stack-bar__seg--dec { background: #D1D6DB; }
+
+  .jury-cells {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .jury-cell {
+    text-align: center;
+    padding: 8px 4px;
+    background: var(--surface-sub);
+    border-radius: var(--radius-md);
+  }
+  .jury-cell--inc {
+    background: var(--teal-50);
+  }
+  .jury-cell__num {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+    font-family: var(--font-mono);
+  }
+  .jury-cell--inc .jury-cell__num { color: var(--teal-800); }
+  .jury-cell--dec .jury-cell__num { color: var(--text-tertiary); }
+  .jury-cell__lbl {
+    font-size: 10px;
+    margin-top: 4px;
+    letter-spacing: 0.3px;
+    color: var(--text-secondary);
+  }
+  .jury-cell--inc .jury-cell__lbl { color: var(--teal-800); }
+  .jury-cell--dec .jury-cell__lbl { color: var(--text-tertiary); }
+
+  .jury-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .jury-meta span code {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+  }
+
+  /* === Verdict === */
+  .verdict {
+    background: var(--surface);
+    border: 1.5px solid var(--info-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 12px rgba(49,130,246,0.12);
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .verdict__label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.8px;
+  }
+  .verdict__label i { font-size: 14px; color: var(--info-fg); }
+  .verdict__items {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .verdict__item {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .verdict__ticker {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+  }
+  .verdict__delta {
+    font-size: 16px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+  }
+  .verdict__delta--pos { color: var(--teal-800); }
+  .verdict__delta--neg { color: #791F1F; }
+  .verdict__compliance {
+    padding: 4px 10px;
+    background: var(--success-bg);
+    color: var(--success-fg);
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* === Footer note === */
+  .note {
+    margin-top: 24px;
+    padding: 12px 16px;
+    background: var(--surface-sub);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .note strong { color: var(--text-primary); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<main>
+
+  <!-- ============ HEADER ============ -->
+  <header class="head">
+    <div class="head__top">
+      <span class="pill">FINAL · 회고</span>
+      <span class="head__meta">주간 정기 점검 · 2026.05.21 20:57</span>
+    </div>
+    <h1>결정을 완료했습니다</h1>
+    <p class="head__sub">선택: 보수적 리밸런싱 (50%) · 분기 <code>WEAK_CONSERVATIVE</code></p>
+  </header>
+
+  <!-- ============ SCALE HERO ============ -->
+  <section class="hero" aria-label="합의 저울">
+
+    <div class="hero__title">
+      <div class="hero__title-text">
+        <i class="ti ti-scale" aria-hidden="true"></i>
+        <span>CONSENSUS BALANCE</span>
+      </div>
+      <span class="hero__angle">tilt <span id="angle-readout">12.8°</span></span>
+    </div>
+
+    <div class="scale-wrap">
+      <svg class="scale-svg" viewBox="0 0 400 500" role="img" aria-label="정의의 여신 저울 — 검증(JURY) 측이 더 무거워 우측으로 기운 상태">
+
+        <defs>
+          <!-- ===== GUNMETAL / SILVER ===== -->
+          <linearGradient id="g-metal-v" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#cfcfcf"/>
+            <stop offset="22%"  stop-color="#9a9a9a"/>
+            <stop offset="60%"  stop-color="#565656"/>
+            <stop offset="100%" stop-color="#222222"/>
+          </linearGradient>
+          <!-- polished cylinder (across the shaft) -->
+          <linearGradient id="g-metal-cyl" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#181818"/>
+            <stop offset="16%"  stop-color="#6e6e6e"/>
+            <stop offset="34%"  stop-color="#d9d9d9"/>
+            <stop offset="50%"  stop-color="#9a9a9a"/>
+            <stop offset="68%"  stop-color="#4a4a4a"/>
+            <stop offset="100%" stop-color="#141414"/>
+          </linearGradient>
+          <!-- beam cross-section, lit from above -->
+          <linearGradient id="g-beam" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#e6e6e6"/>
+            <stop offset="32%"  stop-color="#a8a8a8"/>
+            <stop offset="70%"  stop-color="#565656"/>
+            <stop offset="100%" stop-color="#1c1c1c"/>
+          </linearGradient>
+          <radialGradient id="g-pan" cx="0.42" cy="0.30" r="0.85">
+            <stop offset="0%"   stop-color="#e8e8e8"/>
+            <stop offset="35%"  stop-color="#b0b0b0"/>
+            <stop offset="68%"  stop-color="#666666"/>
+            <stop offset="100%" stop-color="#202020"/>
+          </radialGradient>
+          <radialGradient id="g-sphere" cx="0.36" cy="0.30" r="0.78">
+            <stop offset="0%"   stop-color="#eaeaea"/>
+            <stop offset="30%"  stop-color="#9c9c9c"/>
+            <stop offset="70%"  stop-color="#484848"/>
+            <stop offset="100%" stop-color="#121212"/>
+          </radialGradient>
+          <linearGradient id="g-base" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#bcbcbc"/>
+            <stop offset="45%"  stop-color="#646464"/>
+            <stop offset="100%" stop-color="#101010"/>
+          </linearGradient>
+          <!-- soft drop shadow -->
+          <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.28"/>
+          </filter>
+        </defs>
+
+        <!-- floor shadow -->
+        <ellipse cx="200" cy="484" rx="122" ry="9" fill="#000000" opacity="0.13"/>
+
+        <!-- ============ STATIC PEDESTAL + PILLAR ============ -->
+        <g filter="url(#softShadow)">
+          <!-- round tiered base -->
+          <ellipse cx="200" cy="470" rx="100" ry="16" fill="url(#g-base)"/>
+          <ellipse cx="200" cy="463" rx="94" ry="9"  fill="#c4c4c4" opacity="0.4"/>
+          <ellipse cx="200" cy="454" rx="78" ry="13" fill="url(#g-base)"/>
+          <ellipse cx="200" cy="444" rx="56" ry="9"  fill="#2e2e2e"/>
+          <ellipse cx="200" cy="436" rx="40" ry="8"  fill="url(#g-metal-v)"/>
+
+          <!-- lower decorative sphere -->
+          <circle cx="200" cy="410" r="26" fill="url(#g-sphere)"/>
+          <ellipse cx="192" cy="402" rx="8" ry="5" fill="#ffffff" opacity="0.32"/>
+          <ellipse cx="200" cy="386" rx="16" ry="6" fill="url(#g-metal-v)"/>
+
+          <!-- tapered shaft -->
+          <path d="M189 184 L211 184 L214 386 L186 386 Z" fill="url(#g-metal-cyl)"/>
+          <rect x="194.5" y="186" width="2.4" height="198" rx="1" fill="#eaeaea" opacity="0.5"/>
+
+          <!-- middle baroque nodes -->
+          <ellipse cx="200" cy="336" rx="21" ry="7.5" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.6"/>
+          <ellipse cx="200" cy="339" rx="21" ry="4.5" fill="#141414" opacity="0.35"/>
+          <ellipse cx="200" cy="326" rx="14" ry="4"   fill="#cfcfcf" opacity="0.35"/>
+          <ellipse cx="200" cy="248" rx="20" ry="7"   fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.6"/>
+          <ellipse cx="200" cy="251" rx="20" ry="4"   fill="#141414" opacity="0.35"/>
+
+          <!-- top floral ornament (acanthus scrolls) -->
+          <path d="M200 160 C 180 158 166 172 170 192 C 184 184 192 180 200 182 C 208 180 216 184 230 192 C 234 172 220 158 200 160 Z"
+                fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.8"/>
+          <circle cx="171" cy="190" r="4" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.6"/>
+          <circle cx="229" cy="190" r="4" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.6"/>
+          <ellipse cx="200" cy="166" rx="7" ry="10" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.6"/>
+
+          <!-- fulcrum bearing -->
+          <circle cx="200" cy="150" r="9" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.8"/>
+          <circle cx="200" cy="150" r="3.5" fill="#1a1a1a"/>
+        </g>
+
+        <!-- ============ SWAY WRAPPER (gentle perpetual motion) ============ -->
+        <g class="scale-sway">
+        <!-- ============ ROTATING ARM ASSEMBLY ============ -->
+        <g class="scale-arm" id="scale-arm" filter="url(#softShadow)">
+
+          <!-- curved beam: ends turn upward -->
+          <path d="M 60 142 Q 130 158 200 158 Q 270 158 340 142" fill="none" stroke="url(#g-beam)" stroke-width="11" stroke-linecap="round"/>
+          <path d="M 60 139 Q 130 154 200 154 Q 270 154 340 139" fill="none" stroke="#ededed" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+          <path d="M 60 146 Q 130 162 200 162 Q 270 162 340 146" fill="none" stroke="#101010" stroke-width="1.6" stroke-linecap="round" opacity="0.5"/>
+
+          <!-- beam-end scroll terminals (chains attach here) -->
+          <circle cx="60"  cy="142" r="6.5" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.8"/>
+          <circle cx="60"  cy="142" r="2.6" fill="#1a1a1a"/>
+          <circle cx="340" cy="142" r="6.5" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.8"/>
+          <circle cx="340" cy="142" r="2.6" fill="#1a1a1a"/>
+
+          <!-- central decorative crown -->
+          <rect x="184" y="144" width="32" height="7" rx="2.5" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.6"/>
+          <path d="M185 146 L191 122 L200 136 L209 122 L215 146 Z" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.8"/>
+          <circle cx="191" cy="121" r="3"   fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.5"/>
+          <circle cx="209" cy="121" r="3"   fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.5"/>
+          <line x1="200" y1="136" x2="200" y2="118" stroke="#7a7a7a" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="200" cy="115" r="3.4" fill="url(#g-metal-v)" stroke="#141414" stroke-width="0.5"/>
+
+          <!-- ============ LEFT PAN (AGENTS) — counter-rotates to hang level ============ -->
+          <g class="scale-pan scale-pan--left" id="pan-left">
+            <!-- 3-cord chain of oval links -->
+            <line x1="60" y1="142" x2="14" y2="298" stroke="#6f6f6f" stroke-width="1.4"/>
+            <line x1="60" y1="142" x2="14" y2="298" stroke="#d4d4d4" stroke-width="3.2" stroke-dasharray="2.6 3.3" stroke-linecap="round" opacity="0.85"/>
+            <line x1="60" y1="142" x2="60" y2="294" stroke="#6f6f6f" stroke-width="1.4"/>
+            <line x1="60" y1="142" x2="60" y2="294" stroke="#d4d4d4" stroke-width="3.2" stroke-dasharray="2.6 3.3" stroke-linecap="round" opacity="0.85"/>
+            <line x1="60" y1="142" x2="106" y2="298" stroke="#6f6f6f" stroke-width="1.4"/>
+            <line x1="60" y1="142" x2="106" y2="298" stroke="#d4d4d4" stroke-width="3.2" stroke-dasharray="2.6 3.3" stroke-linecap="round" opacity="0.85"/>
+
+            <!-- shallow round dish -->
+            <path d="M 8 300 Q 60 328 112 300" fill="url(#g-pan)" stroke="#141414" stroke-width="1"/>
+            <ellipse cx="60" cy="300" rx="54" ry="12" fill="url(#g-pan)" stroke="#141414" stroke-width="1.2"/>
+            <ellipse cx="60" cy="297" rx="50" ry="9"  fill="#e0e0e0" opacity="0.45"/>
+            <ellipse cx="60" cy="300" rx="44" ry="8.5" fill="#3a3a3a"/>
+            <ellipse cx="52" cy="298" rx="22" ry="4.5" fill="#d8d8d8" opacity="0.30"/>
+            <!-- weights -->
+            <circle cx="46" cy="293" r="7"   fill="url(#g-sphere)"/>
+            <circle cx="62" cy="294" r="6.5" fill="url(#g-sphere)"/>
+            <circle cx="76" cy="295" r="6"   fill="url(#g-sphere)"/>
+            <circle cx="55" cy="286" r="6"   fill="url(#g-sphere)"/>
+
+            <text x="60" y="333" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" fill="#4E5968" letter-spacing="0.5">AGENTS</text>
+            <text x="60" y="345" text-anchor="middle" font-family="monospace" font-size="9" fill="#8B95A1">n=4</text>
+          </g>
+
+          <!-- ============ RIGHT PAN (JURY) — counter-rotates to hang level ============ -->
+          <g class="scale-pan scale-pan--right" id="pan-right">
+            <line x1="340" y1="142" x2="294" y2="298" stroke="#6f6f6f" stroke-width="1.4"/>
+            <line x1="340" y1="142" x2="294" y2="298" stroke="#d4d4d4" stroke-width="3.2" stroke-dasharray="2.6 3.3" stroke-linecap="round" opacity="0.85"/>
+            <line x1="340" y1="142" x2="340" y2="294" stroke="#6f6f6f" stroke-width="1.4"/>
+            <line x1="340" y1="142" x2="340" y2="294" stroke="#d4d4d4" stroke-width="3.2" stroke-dasharray="2.6 3.3" stroke-linecap="round" opacity="0.85"/>
+            <line x1="340" y1="142" x2="386" y2="298" stroke="#6f6f6f" stroke-width="1.4"/>
+            <line x1="340" y1="142" x2="386" y2="298" stroke="#d4d4d4" stroke-width="3.2" stroke-dasharray="2.6 3.3" stroke-linecap="round" opacity="0.85"/>
+
+            <path d="M 288 300 Q 340 328 392 300" fill="url(#g-pan)" stroke="#141414" stroke-width="1"/>
+            <ellipse cx="340" cy="300" rx="54" ry="12" fill="url(#g-pan)" stroke="#141414" stroke-width="1.2"/>
+            <ellipse cx="340" cy="297" rx="50" ry="9"  fill="#e0e0e0" opacity="0.45"/>
+            <ellipse cx="340" cy="300" rx="44" ry="8.5" fill="#3a3a3a"/>
+            <ellipse cx="332" cy="298" rx="22" ry="4.5" fill="#d8d8d8" opacity="0.30"/>
+            <!-- weights (heavier side) -->
+            <circle cx="324" cy="292" r="7"   fill="url(#g-sphere)"/>
+            <circle cx="340" cy="293" r="7"   fill="url(#g-sphere)"/>
+            <circle cx="356" cy="293" r="6.5" fill="url(#g-sphere)"/>
+            <circle cx="332" cy="285" r="6"   fill="url(#g-sphere)"/>
+            <circle cx="348" cy="285" r="6"   fill="url(#g-sphere)"/>
+
+            <text x="340" y="333" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="11" font-weight="600" fill="#4E5968" letter-spacing="0.5">JURY</text>
+            <text x="340" y="345" text-anchor="middle" font-family="monospace" font-size="9" fill="#8B95A1">n=11</text>
+          </g>
+        </g>
+        </g>
+      </svg>
+    </div>
+
+    <div class="readout">
+      <div class="readout__item">
+        <div class="readout__label">CONSENSUS</div>
+        <div class="readout__value" id="score-display">0.42</div>
+        <div class="badge badge--weak" id="strength-badge">WEAK</div>
+      </div>
+      <div class="readout__item">
+        <div class="readout__label">LEAN</div>
+        <div class="readout__value readout__value--sub" id="lean-display">
+          <span style="color: var(--teal-800);">→ JURY</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">검증 측이 더 무거움</div>
+      </div>
+      <div class="readout__item">
+        <div class="readout__label">DURATION</div>
+        <div class="readout__value readout__value--sub">11.4<span style="font-size: 12px; color: var(--text-tertiary); margin-left: 2px;">s</span></div>
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">심의 소요시간</div>
+      </div>
+    </div>
+
+    <!-- Interactive slider -->
+    <div class="slider-section">
+      <div class="slider-section__label">
+        <span>합의 점수 시뮬레이션</span>
+        <span class="slider-section__hint">↔ 슬라이더를 움직여 저울 기울기 변화 확인</span>
+      </div>
+      <input type="range" id="consensus-slider" min="0" max="1" step="0.01" value="0.42">
+      <div class="slider-marks">
+        <span>0.00 · WEAK</span>
+        <span>0.50</span>
+        <span>1.00 · STRONG</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TWO PANELS ============ -->
+  <div class="panels">
+
+    <!-- AGENTS -->
+    <div class="panel panel--agents">
+      <div class="panel__head">
+        <i class="ti ti-cpu" aria-hidden="true"></i>
+        <span class="panel__title">제안 측 · AGENTS</span>
+        <span class="panel__n">n=4</span>
+      </div>
+
+      <div class="agent-row">
+        <span class="agent-row__name">Signal</span>
+        <div class="agent-row__bar"><div class="agent-row__bar-fill" style="width: 72%;"></div></div>
+        <span class="agent-row__val">+2%p</span>
+      </div>
+      <div class="agent-row">
+        <span class="agent-row__name">Profit</span>
+        <div class="agent-row__bar"><div class="agent-row__bar-fill" style="width: 40%; background: var(--purple-400);"></div></div>
+        <span class="agent-row__val">HOLD</span>
+      </div>
+      <div class="agent-row">
+        <span class="agent-row__name">Cost</span>
+        <div class="agent-row__bar"><div class="agent-row__bar-fill" style="width: 55%;"></div></div>
+        <span class="agent-row__val">LIGHT</span>
+      </div>
+      <div class="agent-row agent-row--master">
+        <span class="agent-row__name"><i class="ti ti-crown" aria-hidden="true"></i>Master</span>
+        <div class="agent-row__bar"><div class="agent-row__bar-fill" style="width: 62%;"></div></div>
+        <span class="agent-row__val">LIGHT</span>
+      </div>
+
+      <div class="panel__footer">
+        <i class="ti ti-quote" aria-hidden="true"></i>
+        단기채(153130) 비중 +2%p, 코스피200(069500) −2%p 권고
+      </div>
+    </div>
+
+    <!-- JURY -->
+    <div class="panel panel--jury">
+      <div class="panel__head panel__head--right">
+        <span class="panel__n">n=11</span>
+        <span class="panel__title">검증 측 · JURY</span>
+        <i class="ti ti-users" aria-hidden="true"></i>
+      </div>
+
+      <div class="stack-bar">
+        <div class="stack-bar__seg--inc" style="width: 45.5%;" title="Increase 5"></div>
+        <div class="stack-bar__seg--hold" style="width: 27.3%;" title="Hold 3"></div>
+        <div class="stack-bar__seg--dec" style="width: 27.2%;" title="Decrease 0"></div>
+      </div>
+
+      <div class="jury-cells">
+        <div class="jury-cell jury-cell--inc">
+          <div class="jury-cell__num">5</div>
+          <div class="jury-cell__lbl"><i class="ti ti-triangle" style="font-size:9px;" aria-hidden="true"></i> INCREASE</div>
+        </div>
+        <div class="jury-cell">
+          <div class="jury-cell__num">3</div>
+          <div class="jury-cell__lbl"><i class="ti ti-minus" style="font-size:9px;" aria-hidden="true"></i> HOLD</div>
+        </div>
+        <div class="jury-cell jury-cell--dec">
+          <div class="jury-cell__num">0</div>
+          <div class="jury-cell__lbl"><i class="ti ti-triangle-inverted" style="font-size:9px;" aria-hidden="true"></i> DECREASE</div>
+        </div>
+      </div>
+
+      <div class="panel__footer">
+        <div class="jury-meta">
+          <span>의견 <code>8</code></span>
+          <span>정보 <code>3</code></span>
+          <span>R2변경 <code>0</code></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VERDICT ============ -->
+  <div class="verdict">
+    <div style="flex: 1; min-width: 0;">
+      <div class="verdict__label">
+        <i class="ti ti-stamp" aria-hidden="true"></i>
+        <span>VERDICT · 사용자 승인 실행됨</span>
+      </div>
+      <div class="verdict__items">
+        <div class="verdict__item">
+          <span class="verdict__ticker">153130</span>
+          <span class="verdict__delta verdict__delta--pos">+2%p</span>
+        </div>
+        <div class="verdict__item">
+          <span class="verdict__ticker">069500</span>
+          <span class="verdict__delta verdict__delta--neg">−2%p</span>
+        </div>
+      </div>
+    </div>
+    <span class="verdict__compliance"><i class="ti ti-check" style="font-size:11px;" aria-hidden="true"></i> Compliance PASS</span>
+  </div>
+
+  <!-- ============ FOOTER NOTE ============ -->
+  <div class="note">
+    <strong>읽는 법:</strong> 저울이 수평일수록 합의가 강함. 좌측(AGENTS)과 우측(JURY)의 무게 차이가 클수록 기울기가 심해짐.
+    이번 케이스(0.42)는 JURY 측이 더 무거워(n=11, 만장일치에 가까운 방향성) 우측으로 약 13° 기울었습니다.
+    슬라이더를 움직여 다른 합의 강도에서의 저울 모양을 비교해보세요.
+  </div>
+
+</main>
+
+<script>
+  const slider = document.getElementById('consensus-slider');
+  const scoreDisplay = document.getElementById('score-display');
+  const angleDisplay = document.getElementById('angle-readout');
+  const strengthBadge = document.getElementById('strength-badge');
+  const leanDisplay = document.getElementById('lean-display');
+  const scaleArm = document.getElementById('scale-arm');
+  const panLeft = document.getElementById('pan-left');
+  const panRight = document.getElementById('pan-right');
+
+  // Map consensus [0..1] to tilt angle [22°..0°]
+  // 1.0 = balanced (0°), 0.0 = max tilt (22°)
+  const MAX_TILT = 22;
+
+  function update(consensus) {
+    const angle = (1 - consensus) * MAX_TILT;
+
+    scoreDisplay.textContent = consensus.toFixed(2);
+    angleDisplay.textContent = angle.toFixed(1) + '°';
+    scaleArm.style.transform = `rotate(${angle}deg)`;
+    // pans counter-rotate so they keep hanging level (gravity)
+    panLeft.style.transform = `rotate(${-angle}deg)`;
+    panRight.style.transform = `rotate(${-angle}deg)`;
+
+    // Strength badge
+    if (consensus >= 0.7) {
+      strengthBadge.textContent = 'STRONG';
+      strengthBadge.className = 'badge badge--strong';
+    } else if (consensus >= 0.5) {
+      strengthBadge.textContent = 'MODERATE';
+      strengthBadge.className = 'badge badge--moderate';
+    } else {
+      strengthBadge.textContent = 'WEAK';
+      strengthBadge.className = 'badge badge--weak';
+    }
+
+    // Lean indicator
+    if (consensus >= 0.85) {
+      leanDisplay.innerHTML = '<span style="color: var(--text-secondary);">— BALANCED</span>';
+    } else {
+      leanDisplay.innerHTML = '<span style="color: var(--teal-800);">→ JURY</span>';
+    }
+  }
+
+  slider.addEventListener('input', (e) => {
+    update(parseFloat(e.target.value));
+  });
+
+  // Entrance: start balanced, then spring into the real tilt so the
+  // balance visibly settles on load.
+  const TARGET = 0.42;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) {
+    update(TARGET);
+  } else {
+    update(1);                       // level
+    requestAnimationFrame(() => {
+      setTimeout(() => update(TARGET), 180);  // swing + settle via CSS spring
+    });
+  }
+</script>
+
+</body>
+</html>

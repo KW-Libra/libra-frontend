@@ -54,9 +54,21 @@ const router = createRouter({
       meta: { public: true }
     },
     {
+      path: '/ips',
+      name: 'ips',
+      component: () => import('@/pages/IPSPage.vue'),
+      meta: { public: true }
+    },
+    {
       path: '/design/run-screen',
       name: 'design-run-screen',
       component: () => import('@/pages/design/RunScreenDesign.vue'),
+      meta: { public: true }
+    },
+    {
+      path: '/design/scale',
+      name: 'design-scale',
+      component: () => import('@/pages/design/ScalePreview.vue'),
       meta: { public: true }
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
