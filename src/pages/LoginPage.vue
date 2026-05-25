@@ -7,9 +7,8 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-// 시드 demo 계정 prefill — 실제 운영에선 빈 값.
-const email = ref('demo@libra.local')
-const password = ref('demo1234')
+const email = ref('')
+const password = ref('')
 const error = ref<string | null>(null)
 const submitting = ref(false)
 

@@ -22,6 +22,26 @@ const router = createRouter({
       name: 'dashboard',
       component: () => import('@/pages/DashboardPage.vue')
     },
+    {
+      path: '/backtests/kr-objective-2020-2023-opendart-googlenews',
+      name: 'backtest-validation',
+      component: () => import('@/pages/BacktestValidationPage.vue')
+    },
+    {
+      path: '/run/:threadId',
+      name: 'run',
+      component: () => import('@/pages/RunPage.vue')
+    },
+    {
+      path: '/run/:threadId/result',
+      name: 'run-result',
+      component: () => import('@/pages/RunResultPage.vue')
+    },
+    {
+      path: '/run/:threadId/report',
+      name: 'run-report',
+      component: () => import('@/pages/RunReportPage.vue')
+    },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
   ]
 })

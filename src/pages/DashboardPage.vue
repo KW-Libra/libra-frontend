@@ -177,6 +177,42 @@ const runProgressPercent = computed(() => {
   const completed = runStageCards.value.filter((stage) => stage.status === 'completed').length
   return Math.round((completed / runStageCards.value.length) * 100)
 })
+const activeRunStage = computed(() => runStageCards.value.find((stage) => stage.status === 'active'))
+const completedRunStageCount = computed(() =>
+  runStageCards.value.filter((stage) => stage.status === 'completed').length
+)
+const runDecisionValue = computed(() =>
+  finalDecisionDraft.value?.decision || runStream.completion?.decision || '-'
+)
+const dashboardTotalValue = computed(() =>
+  toNumber(visibleSummary.value?.totalValuationAmount)
+  ?? toNumber(visibleSummary.value?.netAssetAmount)
+  ?? 0
+)
+const dashboardHoldings = computed(() => balance.value?.holdings ?? [])
+const dashboardHoldingCount = computed(() =>
+  balance.value?.holdings.length ?? latestSnapshot.value?.holdingsCount ?? 0
+)
+const dashboardCashWeight = computed(() => {
+  const total = dashboardTotalValue.value
+  if (!total) return null
+  const cash = toNumber(visibleSummary.value?.depositAmount) ?? 0
+  return Math.max(0, Math.min(100, (cash / total) * 100))
+})
+const kisSetupRequired = computed(() =>
+  !status.value?.registered || !status.value?.restConfigured || !status.value?.accountConfigured
+)
+const recentRunDecisions = computed(() => {
+  if (!runStream.currentThreadId || !runStream.completion) return []
+  return [
+    {
+      threadId: runStream.currentThreadId,
+      label: runStream.completion.decision || '판단 완료',
+      branch: runStream.completion.branch || runStream.completion.run_status,
+      status: runStream.completion.approval_response?.approved === false ? 'cancelled' : 'approved'
+    }
+  ]
+})
 
 const agentCompletedEvents = computed(() =>
   runStream.events.filter((event): event is AgentCompletedRunEvent => event.event === 'agent_completed')
@@ -363,15 +399,18 @@ async function startAgentRun() {
   loading.agent = true
   try {
     const portfolio = await currentAgentPortfolio()
+    const threadId = `web_${crypto.randomUUID()}`
     const body: RunStartBody = {
       query: agentQuery.value.trim() || '현재 포트폴리오를 점검해줘.',
       portfolio,
+      thread_id: threadId,
       trigger: 'user_request',
       depth: 'shallow',
       deadline_seconds: 300,
       approval_required: true,
       enable_human_interrupts: true
     }
+    await router.push(`/run/${encodeURIComponent(threadId)}`)
     await runStream.start(body)
   } catch (e) {
     errors.agent = errorMessage(e, '에이전트 실행을 시작하지 못했습니다')
@@ -493,6 +532,25 @@ function formatMoney(value: DecimalValue | undefined) {
   }).format(parsed)
 }
 
+function formatKrw(value: DecimalValue | undefined) {
+  const formatted = formatMoney(value)
+  return formatted === '-' ? '-' : `₩${formatted}`
+}
+
+function formatHoldingWeight(value: DecimalValue | undefined) {
+  const valuation = toNumber(value) ?? 0
+  const total = dashboardTotalValue.value || dashboardHoldings.value.reduce((sum, item) => sum + (toNumber(item.valuationAmount) ?? 0), 0)
+  if (!total) return '-'
+  return `${((valuation / total) * 100).toFixed(1)}%`
+}
+
+function holdingWeightBar(value: DecimalValue | undefined) {
+  const valuation = toNumber(value) ?? 0
+  const total = dashboardTotalValue.value || dashboardHoldings.value.reduce((sum, item) => sum + (toNumber(item.valuationAmount) ?? 0), 0)
+  if (!total) return '0%'
+  return `${Math.max(2, Math.min(100, (valuation / total) * 100))}%`
+}
+
 function formatQuantity(value: DecimalValue | undefined) {
   const parsed = toNumber(value)
   if (parsed === null) return '-'
@@ -515,6 +573,16 @@ function formatDate(value: string | null | undefined) {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(value))
+}
+
+function formatRelativeTime(value: string | null | undefined) {
+  if (!value) return '동기화 전'
+  const diffMin = Math.floor((Date.now() - new Date(value).getTime()) / 60000)
+  if (diffMin < 1) return '방금 전'
+  if (diffMin < 60) return `${diffMin}분 전`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}시간 전`
+  return new Date(value).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
 }
 
 function toneFor(value: DecimalValue | undefined) {
@@ -836,411 +904,254 @@ function formatUnknown(value: unknown) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f6f7f9] text-gray-950">
+  <div class="min-h-screen bg-gray-50 text-gray-900">
     <header class="border-b border-gray-200 bg-white">
-      <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-        <div>
-          <h1 class="text-2xl font-semibold tracking-normal">Libra</h1>
-          <p class="mt-1 text-sm text-gray-500">
-            {{ auth.user?.email || '계정 확인 중' }}
-          </p>
+      <div class="max-w-6xl mx-auto px-8 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-8 h-8 rounded bg-gray-900 text-white flex items-center justify-center text-sm font-bold"
+          >L</div>
+          <span class="text-lg font-semibold tracking-tight">Libra</span>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-4">
+          <span class="text-xs text-gray-500" v-if="auth.user?.email">{{ auth.user.email }}</span>
           <button
             type="button"
-            class="h-9 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            class="text-xs text-gray-600 hover:text-gray-900 transition"
             :disabled="loading.status || loading.snapshots || loading.audits"
             @click="refreshAll"
-          >
-            새로고침
-          </button>
+          >새로고침</button>
           <button
             type="button"
-            class="h-9 rounded bg-gray-900 px-3 text-sm text-white hover:bg-gray-800"
+            class="text-xs text-gray-600 hover:text-gray-900 transition"
+            @click="router.push('/backtests/kr-objective-2020-2023-opendart-googlenews')"
+          >검증 결과</button>
+          <button
             @click="onLogout"
-          >
-            로그아웃
-          </button>
+            class="text-xs text-gray-600 hover:text-gray-900 transition"
+          >로그아웃</button>
         </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <section class="grid gap-4 lg:grid-cols-4">
-        <div class="rounded border border-gray-200 bg-white p-4">
-          <p class="text-xs font-medium uppercase text-gray-500">KIS</p>
-          <div class="mt-3 flex items-center justify-between">
-            <p class="text-lg font-semibold">{{ statusText() }}</p>
-            <span
-              class="rounded border px-2 py-1 text-xs font-medium"
-              :class="statusClass(status?.enabled && status?.restConfigured && status?.accountConfigured)"
-            >
-              {{ loading.status ? '확인 중' : environmentLabel(status?.environment) }}
-            </span>
-          </div>
-          <p v-if="errors.status" class="mt-3 text-sm text-red-600">{{ errors.status }}</p>
-        </div>
+    <main class="max-w-6xl mx-auto px-8 py-10">
+      <div class="mb-8">
+        <h1 class="text-2xl font-medium tracking-tight mb-1">대시보드</h1>
+        <p class="text-sm text-gray-600">포트폴리오 현황 및 리밸런싱 검토</p>
+      </div>
 
-        <div class="grid grid-cols-2 gap-3 rounded border border-gray-200 bg-white p-4 lg:col-span-3 sm:grid-cols-3 xl:grid-cols-7">
-          <div>
-            <p class="text-xs text-gray-500">REST</p>
-            <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.restConfigured) }}</p>
+      <div
+        v-if="kisSetupRequired"
+        class="flex items-stretch mb-6 bg-white border border-amber-200 rounded-lg overflow-hidden"
+      >
+        <div class="w-1 bg-amber-400"></div>
+        <div class="flex-1 flex items-center gap-3 p-4">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span class="text-xs font-medium tracking-wider text-amber-700">KIS 설정 필요</span>
           </div>
-          <div>
-            <p class="text-xs text-gray-500">계좌</p>
-            <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.accountConfigured) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">주문전송</p>
-            <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.tradingEnabled) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">WebSocket</p>
-            <p class="mt-1 text-sm font-semibold">{{ boolLabel(status?.webSocketConfigured) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">최대수량</p>
-            <p class="mt-1 text-sm font-semibold">{{ status?.maxOrderQuantity ?? '-' }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">최대금액</p>
-            <p class="mt-1 text-sm font-semibold">{{ formatMoney(status?.maxOrderAmount) }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-500">허용종목</p>
-            <p class="mt-1 text-sm font-semibold">
-              {{ status?.symbolAllowListEnabled ? `${status?.allowedSymbolsCount ?? 0}개` : '전체' }}
-            </p>
+          <div class="h-4 w-px bg-amber-200"></div>
+          <div class="flex-1 text-xs text-gray-700">
+            현재 상태 <span class="font-semibold">{{ statusText() }}</span> ·
+            REST {{ boolLabel(status?.restConfigured) }} · 계좌 {{ boolLabel(status?.accountConfigured) }}
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="mt-5 rounded-lg border border-gray-200 bg-white">
-        <div class="border-b border-gray-100 px-5 py-5">
-          <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="min-w-0">
-              <div class="mb-3 flex flex-wrap items-center gap-2">
-                <span
-                  class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
-                  :class="runStream.isStreaming ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 bg-gray-50 text-gray-600'"
-                >
-                  <span
-                    class="h-1.5 w-1.5 rounded-full"
-                    :class="runStream.isStreaming ? 'animate-pulse bg-blue-500' : 'bg-gray-400'"
-                  ></span>
-                  {{ runStream.phase }}
-                </span>
-                <span v-if="runStream.currentThreadId" class="font-mono text-xs text-gray-400">
-                  {{ runStream.currentThreadId }}
-                </span>
+      <div class="grid grid-cols-3 gap-6">
+        <div class="col-span-2 space-y-6">
+          <div class="bg-white border border-gray-200 rounded-lg p-6">
+            <div class="flex items-baseline justify-between mb-5">
+              <div>
+                <div class="text-xs font-medium tracking-wider text-gray-500 mb-1">포트폴리오</div>
+                <div class="text-lg font-medium">내 KIS 포트폴리오</div>
               </div>
-              <h2 class="text-2xl font-semibold tracking-normal text-gray-950">{{ runHeadline }}</h2>
-              <p class="mt-2 max-w-3xl text-sm leading-6 text-gray-600">{{ runSubtext }}</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <button
-                v-if="runStream.isStreaming"
-                type="button"
-                class="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50"
-                @click="runStream.cancel"
-              >
-                중단
-              </button>
-              <button
-                type="button"
-                class="h-9 rounded-md bg-gray-900 px-3 text-sm text-white hover:bg-gray-800 disabled:opacity-50"
-                :disabled="loading.agent || runStream.isStreaming"
-                @click="startAgentRun"
-              >
-                판단 시작
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <p class="text-xs text-gray-500">이벤트</p>
-              <p class="mt-1 text-xl font-semibold font-mono text-gray-950">{{ runTraceStats.events }}</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <p class="text-xs text-gray-500">에이전트 의견</p>
-              <p class="mt-1 text-xl font-semibold font-mono text-gray-950">{{ runTraceStats.agents }}</p>
-            </div>
-            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <p class="text-xs text-gray-500">도구 관찰</p>
-              <p class="mt-1 text-xl font-semibold font-mono text-gray-950">{{ runTraceStats.tools }}</p>
-            </div>
-            <div class="rounded-lg border p-3" :class="decisionToneClass(finalDecisionDraft?.decision || runStream.completion?.decision)">
-              <p class="text-xs opacity-75">최종 판단</p>
-              <p class="mt-1 text-xl font-semibold">
-                {{ finalDecisionDraft?.decision || runStream.completion?.decision || '-' }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid gap-5 p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div class="space-y-4">
-            <label class="block">
-              <span class="text-xs font-medium text-gray-500">요청</span>
-              <textarea
-                v-model="agentQuery"
-                rows="5"
-                class="mt-1 w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm leading-6 focus:border-gray-900 focus:outline-none"
-              />
-            </label>
-            <p v-if="errors.agent" class="text-sm text-red-600">{{ errors.agent }}</p>
-
-            <div class="rounded-lg border border-gray-200 bg-white p-4">
-              <div class="mb-4 flex items-center justify-between">
-                <span class="text-xs font-medium tracking-wider text-gray-500">진행 단계</span>
-                <span class="font-mono text-xs text-gray-400">{{ runProgressPercent }}%</span>
-              </div>
-              <div class="space-y-2">
-                <div
-                  v-for="(stage, index) in runStageCards"
-                  :key="stage.node"
-                  class="flex items-start gap-3 rounded-lg border px-3 py-3"
-                  :class="stagePillClass(stage.status)"
-                >
-                  <div class="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold" :class="stageDotClass(stage.status)">
-                    <svg
-                      v-if="stage.status === 'completed'"
-                      class="h-3 w-3"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="3"
-                      viewBox="0 0 24 24"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span v-else>{{ index + 1 }}</span>
-                  </div>
-                  <div class="min-w-0">
-                    <p class="text-sm font-semibold">{{ stage.label }}</p>
-                    <p class="mt-0.5 text-xs opacity-75">{{ stage.description }}</p>
-                  </div>
-                </div>
+              <div class="text-right">
+                <div class="text-xs font-medium tracking-wider text-gray-500 mb-1">평가액</div>
+                <div class="text-2xl font-semibold font-mono">{{ formatKrw(visibleSummary?.totalValuationAmount || visibleSummary?.netAssetAmount) }}</div>
               </div>
             </div>
 
-            <div v-if="runStream.pendingInterrupt" class="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p class="text-sm font-semibold text-amber-900">사용자 확인 필요</p>
-              <p class="mt-2 text-sm leading-6 text-amber-800">
-                {{ runStream.pendingInterrupt.message || runStream.pendingInterrupt.decision || '최종 결정 적용 전 확인이 필요합니다.' }}
-              </p>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="h-8 rounded-md bg-gray-900 px-3 text-xs text-white hover:bg-gray-800"
-                  @click="resumeAgent(true, 'APPROVE')"
-                >
-                  승인
-                </button>
-                <button
-                  type="button"
-                  class="h-8 rounded-md border border-gray-300 bg-white px-3 text-xs text-gray-700 hover:bg-gray-50"
-                  @click="resumeAgent(false, 'REJECT')"
-                >
-                  거절
-                </button>
-                <button
-                  type="button"
-                  class="h-8 rounded-md border border-gray-300 bg-white px-3 text-xs text-gray-700 hover:bg-gray-50"
-                  @click="resumeAgent(false, 'REVISE')"
-                >
-                  수정 요청
-                </button>
-              </div>
-            </div>
-
-            <div v-if="runStream.completion" class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p class="text-xs text-gray-500">완료 결과</p>
-              <p class="mt-1 text-base font-semibold text-gray-950">
-                {{ runStream.completion.decision || '-' }}
-                <span class="ml-2 text-sm font-normal text-gray-500">{{ runStream.completion.branch }}</span>
-              </p>
-            </div>
-          </div>
-
-          <div class="space-y-5">
-            <div v-if="!hasRunActivity" class="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">
-              판단을 시작하면 실제 Core 라우팅, 에이전트 의견, 최종 판단 이벤트가 이 화면에 표시됩니다.
-            </div>
-
-            <div v-else class="space-y-5">
-              <div class="grid gap-4 lg:grid-cols-2">
-                <section class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <div class="mb-3 flex items-baseline justify-between">
-                    <h3 class="text-xs font-semibold tracking-[0.14em] text-gray-700">CORE</h3>
-                    <span class="text-xs text-gray-400">{{ coreAgentCompletedEvents.length }} 의견</span>
-                  </div>
-                  <div v-if="!coreAgentCompletedEvents.length" class="rounded-md border border-dashed border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
-                    아직 Core 의견이 없습니다.
-                  </div>
-                  <div v-else class="grid gap-3 sm:grid-cols-2">
-                    <article
-                      v-for="event in coreAgentCompletedEvents"
-                      :key="`${event.data.agent_id}-${event.data.turn_number}`"
-                      class="rounded-lg border p-3"
-                      :class="agentCardClass(event)"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div>
-                          <p class="text-sm font-semibold text-gray-950">{{ agentLabel(event.data.agent_id) }}</p>
-                          <p class="mt-1 text-xs text-gray-500">{{ event.data.verdict || event.data.urgency || '-' }}</p>
-                        </div>
-                        <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium" :class="agentSignalClass(event)">
-                          {{ agentSignalLabel(event) }}
-                        </span>
-                      </div>
-                      <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
-                        <div class="h-full rounded-full bg-gray-900" :style="{ width: agentStrengthWidth(event) }"></div>
-                      </div>
-                      <p class="mt-3 line-clamp-3 text-xs leading-5 text-gray-700">
-                        {{ event.data.reasoning || event.data.limits_acknowledged || '-' }}
-                      </p>
-                      <div class="mt-3 flex items-center justify-between text-[11px] text-gray-500">
-                        <span>confidence {{ agentConfidenceLabel(event) }}</span>
-                        <span>{{ event.data.risk_level || event.data.layer || '' }}</span>
-                      </div>
-                    </article>
-                  </div>
-                </section>
-
-                <section class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <div class="mb-3 flex items-baseline justify-between">
-                    <h3 class="text-xs font-semibold tracking-[0.14em] text-gray-700">DOMAIN</h3>
-                    <span class="text-xs text-gray-400">{{ domainAgentCompletedEvents.length }} 의견</span>
-                  </div>
-                  <div v-if="!domainAgentCompletedEvents.length" class="rounded-md border border-dashed border-gray-200 bg-white px-3 py-8 text-center text-sm text-gray-400">
-                    도메인 심의 대상이 없거나 아직 호출되지 않았습니다.
-                  </div>
-                  <div v-else class="grid gap-3 sm:grid-cols-2">
-                    <article
-                      v-for="event in domainAgentCompletedEvents"
-                      :key="`${event.data.agent_id}-${event.data.turn_number}`"
-                      class="rounded-lg border p-3"
-                      :class="agentCardClass(event)"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div>
-                          <p class="text-sm font-semibold text-gray-950">{{ agentLabel(event.data.agent_id) }}</p>
-                          <p class="mt-1 text-xs text-gray-500">{{ event.data.verdict || event.data.urgency || '-' }}</p>
-                        </div>
-                        <span class="rounded-full border px-2 py-0.5 text-[11px] font-medium" :class="agentSignalClass(event)">
-                          {{ agentSignalLabel(event) }}
-                        </span>
-                      </div>
-                      <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
-                        <div class="h-full rounded-full bg-gray-900" :style="{ width: agentStrengthWidth(event) }"></div>
-                      </div>
-                      <p class="mt-3 line-clamp-3 text-xs leading-5 text-gray-700">
-                        {{ event.data.reasoning || event.data.limits_acknowledged || '-' }}
-                      </p>
-                      <div class="mt-3 flex items-center justify-between text-[11px] text-gray-500">
-                        <span>confidence {{ agentConfidenceLabel(event) }}</span>
-                        <span>{{ event.data.risk_level || event.data.layer || '' }}</span>
-                      </div>
-                    </article>
-                  </div>
-                </section>
-              </div>
-
-              <section v-if="otherAgentCompletedEvents.length" class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="mb-3 flex items-baseline justify-between">
-                  <h3 class="text-xs font-semibold tracking-[0.14em] text-gray-700">OTHER</h3>
-                  <span class="text-xs text-gray-400">{{ otherAgentCompletedEvents.length }} 의견</span>
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <article
-                    v-for="event in otherAgentCompletedEvents"
-                    :key="`${event.data.agent_id}-${event.data.turn_number}`"
-                    class="rounded-lg border p-3"
-                    :class="agentCardClass(event)"
-                  >
-                    <p class="text-sm font-semibold text-gray-950">{{ agentLabel(event.data.agent_id) }}</p>
-                    <p class="mt-2 text-xs leading-5 text-gray-700">{{ event.data.reasoning || event.data.limits_acknowledged || '-' }}</p>
-                  </article>
-                </div>
-              </section>
-
-              <section class="rounded-lg border border-gray-200 bg-white">
-                <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-                  <div>
-                    <h3 class="text-sm font-semibold text-gray-950">실시간 판단 로그</h3>
-                    <p class="mt-1 text-xs text-gray-500">원본 LLM 입출력과 도구 관찰은 펼쳐서 확인합니다.</p>
-                  </div>
-                  <span v-if="lastJudgeAction?.action" class="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600">
-                    {{ lastJudgeAction.action }}
+            <div class="mb-6">
+              <div class="flex items-baseline justify-between mb-2">
+                <div class="text-xs font-medium tracking-wider text-gray-500">현금 비중</div>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-sm font-semibold font-mono text-gray-900">
+                    {{ dashboardCashWeight === null ? '-' : `${dashboardCashWeight.toFixed(1)}%` }}
                   </span>
+                  <span class="text-xs text-gray-400">/ {{ dashboardHoldingCount }}종목</span>
                 </div>
-                <ol class="max-h-[720px] space-y-3 overflow-auto bg-gray-50 p-3">
-                  <li
-                    v-for="(event, index) in runStream.timelineEvents"
-                    :key="`${event.event}-${index}`"
-                    class="rounded-lg border bg-white p-3"
-                    :class="debateToneClass(event)"
-                  >
-                    <div class="flex gap-3">
-                      <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full" :class="eventMarkerClass(event)"></span>
-                      <div class="min-w-0 flex-1">
-                        <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                          <p class="text-sm font-semibold">{{ debateTitle(event) }}</p>
-                          <p v-if="debateMeta(event)" class="text-xs text-gray-500">{{ debateMeta(event) }}</p>
-                        </div>
-                        <p v-if="debateDetail(event)" class="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">
-                          {{ debateDetail(event) }}
-                        </p>
-                        <div v-if="event.event === 'tool_observation'" class="mt-3 space-y-2">
-                          <div
-                            v-for="(tool, toolIndex) in event.data.tools"
-                            :key="`${tool.tool_name}-${toolIndex}`"
-                            class="rounded-md border border-gray-100 bg-white px-3 py-2 text-xs text-gray-700"
-                          >
-                            <p class="font-semibold text-gray-900">{{ tool.tool_name }}</p>
-                            <p v-if="tool.purpose" class="mt-1">{{ tool.purpose }}</p>
-                            <p v-if="tool.summary" class="mt-1 whitespace-pre-wrap">{{ tool.summary }}</p>
-                          </div>
-                        </div>
-                        <div v-if="event.event === 'llm_prompt'" class="mt-3 space-y-3">
-                          <details class="rounded-md border border-gray-100 bg-white">
-                            <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700">System prompt</summary>
-                            <pre class="max-h-[360px] overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-5 text-gray-800">{{ event.data.system_prompt }}</pre>
-                          </details>
-                          <details class="rounded-md border border-gray-100 bg-white">
-                            <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700">User prompt</summary>
-                            <pre class="max-h-[520px] overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-5 text-gray-800">{{ event.data.user_prompt }}</pre>
-                          </details>
-                          <details v-if="event.data.input_schema" class="rounded-md border border-gray-100 bg-white">
-                            <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-gray-700">Tool schema</summary>
-                            <pre class="max-h-[300px] overflow-auto whitespace-pre-wrap px-3 pb-3 text-xs leading-5 text-gray-800">{{ formatUnknown(event.data.input_schema) }}</pre>
-                          </details>
-                        </div>
-                        <div v-if="event.event === 'llm_response'" class="mt-3">
-                          <pre class="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border border-gray-100 bg-white p-3 text-xs leading-5 text-gray-800">{{ formatUnknown(event.data.output) }}</pre>
-                        </div>
-                        <div v-if="event.event === 'llm_skipped' && event.data.context" class="mt-3">
-                          <pre class="max-h-[260px] overflow-auto whitespace-pre-wrap rounded-md border border-gray-100 bg-white p-3 text-xs leading-5 text-gray-800">{{ formatUnknown(event.data.context) }}</pre>
-                        </div>
-                        <div v-if="event.event === 'agent_completed' && event.data.focus_tickers?.length" class="mt-2 flex flex-wrap gap-1">
-                          <span
-                            v-for="ticker in event.data.focus_tickers"
-                            :key="ticker"
-                            class="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600"
-                          >
-                            {{ ticker }}
-                          </span>
-                        </div>
+              </div>
+              <div class="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-gray-700 transition-all"
+                  :style="{ width: dashboardCashWeight === null ? '0%' : `${dashboardCashWeight}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-xs font-medium tracking-wider text-gray-500 mb-3">자산 배분</div>
+              <div v-if="!dashboardHoldings.length" class="text-center py-8">
+                <div class="text-xs text-gray-400 mb-1">아직 조회된 잔고가 없습니다</div>
+                <button
+                  type="button"
+                  class="mt-3 text-xs font-medium text-gray-900 underline underline-offset-4 disabled:opacity-50"
+                  :disabled="loading.balance"
+                  @click="loadBalance(true)"
+                >잔고 동기화</button>
+              </div>
+              <div v-else class="space-y-2">
+                <div
+                  v-for="holding in dashboardHoldings"
+                  :key="holding.symbol"
+                  class="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0"
+                >
+                  <span class="text-[11px] font-mono text-gray-500 w-14">{{ holding.symbol }}</span>
+                  <span class="text-sm text-gray-800 flex-1 truncate">{{ holding.name || holding.symbol }}</span>
+                  <span class="text-xs font-mono" :class="toneClass(holding.profitLossRate)">{{ formatRate(holding.profitLossRate) }}</span>
+                  <div class="w-24">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-gray-700" :style="{ width: holdingWeightBar(holding.valuationAmount) }"></div>
                       </div>
+                      <span class="text-xs font-mono text-gray-700 w-10 text-right">{{ formatHoldingWeight(holding.valuationAmount) }}</span>
                     </div>
-                  </li>
-                </ol>
-              </section>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        <div class="space-y-6">
+          <div class="bg-gray-900 text-white rounded-lg p-6 relative overflow-hidden">
+            <div class="relative z-10">
+              <div class="text-xs font-medium tracking-wider text-gray-400 mb-2">액션</div>
+              <div class="text-lg font-medium mb-2">리밸런싱 검토</div>
+              <p class="text-xs text-gray-300 mb-4 leading-relaxed">
+                실제 포트폴리오 snapshot을 기준으로 AI 에이전트가 시장·위험·제약을 분석하고
+                의사결정 옵션을 제시합니다.
+              </p>
+
+              <div class="mb-4">
+                <div class="text-[10px] text-gray-500 tracking-wider mb-1.5">현재 실행</div>
+                <div class="text-[10px] text-gray-500 leading-relaxed">
+                  {{ runStream.currentThreadId || '대기 중' }}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                @click="startAgentRun"
+                :disabled="loading.agent || runStream.isStreaming"
+                class="w-full bg-white text-gray-900 text-sm font-medium py-2.5 rounded-md hover:bg-gray-100 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <span>{{ runStream.isStreaming ? '검토 중' : '검토 시작' }}</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                @click="router.push('/backtests/kr-objective-2020-2023-opendart-googlenews')"
+                class="mt-2 w-full border border-white/20 text-white text-sm font-medium py-2.5 rounded-md hover:bg-white/10 transition"
+              >
+                검증 결과 보기
+              </button>
+            </div>
+            <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5"></div>
+            <div class="absolute -bottom-12 -right-4 w-24 h-24 rounded-full bg-white/5"></div>
+          </div>
+
+          <div class="bg-white border border-gray-200 rounded-lg p-5">
+            <div class="text-xs font-medium tracking-wider text-gray-500 mb-3">최근 결정 이력</div>
+
+            <div v-if="recentRunDecisions.length === 0" class="text-center py-6">
+              <div class="text-xs text-gray-400 mb-1">아직 결정 이력이 없습니다</div>
+              <div class="text-[10px] text-gray-300">검토를 시작하면 여기에 표시됩니다</div>
+            </div>
+
+            <div v-else class="space-y-2.5">
+              <div
+                v-for="decision in recentRunDecisions"
+                :key="decision.threadId"
+                class="flex items-start gap-2.5 py-2 border-b border-gray-100 last:border-0"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                  :class="decision.status === 'approved' ? 'bg-emerald-400' : 'bg-gray-300'"
+                ></span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs font-medium text-gray-900 truncate">{{ decision.label }}</div>
+                  <div class="text-[11px] text-gray-500 mt-0.5">
+                    <span :class="decision.status === 'approved' ? 'text-emerald-600 font-medium' : ''">
+                      {{ decision.branch || '-' }}
+                    </span>
+                    <span class="text-gray-300 mx-1">·</span>
+                    <span class="font-mono">{{ decision.threadId }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section v-if="hasRunActivity" class="mt-10 bg-white border border-gray-200 rounded-lg p-6">
+        <div class="flex items-baseline justify-between mb-5">
+          <div>
+            <div class="text-xs font-medium tracking-wider text-gray-500 mb-1">실시간 검토</div>
+            <h2 class="text-lg font-medium text-gray-900">{{ runHeadline }}</h2>
+          </div>
+          <button
+            v-if="runStream.currentThreadId"
+            type="button"
+            class="text-xs text-gray-600 hover:text-gray-900 transition"
+            @click="router.push(`/run/${encodeURIComponent(runStream.currentThreadId || '')}/result`)"
+          >결과 화면</button>
+        </div>
+        <div class="grid grid-cols-5 gap-3 mb-6">
+          <div
+            v-for="(stage, index) in runStageCards"
+            :key="stage.node"
+            class="rounded-lg border px-3 py-3"
+            :class="stagePillClass(stage.status)"
+          >
+            <div class="flex items-center gap-2">
+              <div class="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium" :class="stageDotClass(stage.status)">
+                {{ index + 1 }}
+              </div>
+              <span class="text-xs font-medium">{{ stage.label }}</span>
+            </div>
+          </div>
+        </div>
+        <ol class="max-h-[360px] space-y-2 overflow-auto">
+          <li
+            v-for="(event, index) in runStream.timelineEvents"
+            :key="`${event.event}-${index}`"
+            class="rounded-lg border bg-white p-3"
+            :class="debateToneClass(event)"
+          >
+            <div class="flex gap-3">
+              <span class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full" :class="eventMarkerClass(event)"></span>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <p class="text-sm font-semibold">{{ debateTitle(event) }}</p>
+                  <p v-if="debateMeta(event)" class="text-xs text-gray-500">{{ debateMeta(event) }}</p>
+                </div>
+                <p v-if="debateDetail(event)" class="mt-2 line-clamp-2 text-sm leading-6 text-gray-700">
+                  {{ debateDetail(event) }}
+                </p>
+              </div>
+            </div>
+          </li>
+        </ol>
       </section>
+
+      <div class="mt-10 text-center text-[10px] text-gray-400">
+        Libra · Agentic AI Portfolio Rebalancing · backend/KIS 연결
+      </div>
 
       <section class="mt-5 rounded border border-gray-200 bg-white">
         <div class="flex flex-col gap-2 border-b border-gray-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
