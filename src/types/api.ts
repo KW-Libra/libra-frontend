@@ -169,3 +169,57 @@ export interface KisOrderAudit {
   createdAt: string
   updatedAt: string
 }
+
+export interface BacktestMetric {
+  strategy: string
+  group: string | null
+  endingValueKrw: DecimalValue
+  totalReturnPct: DecimalValue
+  annualizedVolatilityPct: DecimalValue
+  sharpeRatio: DecimalValue
+  maxDrawdownPct: DecimalValue
+  trades: number | null
+  turnoverKrw: DecimalValue
+  transactionCostKrw: DecimalValue
+  returnGapVsLibraPctPoints: DecimalValue
+}
+
+export interface BacktestTradeAlphaSummary {
+  signals: number
+  v3Executed: number
+  v3Skipped: number
+  v1Negative20d: number
+  v1Negative60d: number
+  v3Negative20d: number
+  v3Negative60d: number
+}
+
+export interface BacktestTradeAlpha {
+  signalDate: string
+  v3Policy: string
+  v1ExecuteDate: string
+  v3ConfirmationDate: string
+  v3ExecuteDate: string
+  v3WasSkipped: boolean
+  v1TradeAlpha20dPct: DecimalValue
+  v3TradeAlpha20dPct: DecimalValue
+  improvement20dPct: DecimalValue
+  v1TradeAlpha60dPct: DecimalValue
+  v3TradeAlpha60dPct: DecimalValue
+  improvement60dPct: DecimalValue
+}
+
+export interface BacktestValidation {
+  experimentId: string
+  title: string
+  period: string
+  dataSource: string
+  framing: string
+  mainCandidate: BacktestMetric
+  libraV1: BacktestMetric
+  results: BacktestMetric[]
+  tradeAlphaSummary: BacktestTradeAlphaSummary
+  tradeAlpha: BacktestTradeAlpha[]
+  artifacts: string[]
+  notes: string[]
+}

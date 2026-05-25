@@ -23,6 +23,7 @@ export interface RunStartBody {
   query: string
   portfolio?: Record<string, unknown>
   knowledge_base?: Record<string, unknown>
+  ingest_bundle?: Record<string, unknown>
   knowledge_sources?: Record<string, unknown>
   trigger?: 'pull' | 'push' | 'user_request'
   depth?: 'shallow' | 'medium' | 'deep'
