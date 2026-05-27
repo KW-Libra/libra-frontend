@@ -223,3 +223,67 @@ export interface BacktestValidation {
   artifacts: string[]
   notes: string[]
 }
+
+export type BacktestDecisionFrequency = 'daily' | 'every-n-trading-days' | 'weekly'
+
+export interface BacktestRunStartRequest {
+  runId?: string
+  model?: string
+  governancePreset?: string
+  promptVariant?: string
+  executionPolicyMode?: string
+  executionParticipationRate?: string
+  executionMaxAbsDeltaPct?: string
+  executionResolveTickerConflicts?: boolean
+  issueStateEnabled?: boolean
+  issueStateCooldownObservations?: number
+  startDate?: string
+  endDate?: string
+  decisionFrequency?: BacktestDecisionFrequency
+  decisionInterval?: number
+  limit?: number
+  force?: boolean
+}
+
+export interface BacktestRunStatus {
+  runId: string
+  status: 'RUNNING' | 'EXITED' | 'MISSING' | string
+  pid: number | null
+  startedAt: string | null
+  model: string | null
+  governancePreset: string | null
+  executionPolicyMode: string | null
+  issueStateEnabled: boolean | null
+  executionResolveTickerConflicts: boolean | null
+  decisionFrequency: string | null
+  decisionInterval: number | null
+  startDate: string | null
+  endDate: string | null
+  expectedRows: number | null
+  rawRows: number | null
+  lastDate: string | null
+  prefixMatch: boolean | null
+  decisionDistribution: Record<string, number>
+  governanceBranchDistribution: Record<string, number>
+  nonemptyRebalanceCount: number | null
+  emptyRebalanceCount: number | null
+  userDecisionRequiredCount: number | null
+  issueStateSuppressionCount: number | null
+  round1AgentCount: number | null
+  round1Agents: string[]
+  fallbackEventCount: number | null
+  usageRequestCount: number | null
+  inputTokens: number | null
+  outputTokens: number | null
+  cacheCreationInputTokens: number | null
+  cacheReadInputTokens: number | null
+  rawUpdatedAt: string | null
+  eta: string | null
+  rawOut: string | null
+  usageLog: string | null
+  traceOut: string | null
+  stdoutLog: string | null
+  stderrLog: string | null
+  stdoutTail: string[]
+  stderrTail: string[]
+}

@@ -47,6 +47,8 @@ npm run dev
 | `/login` | public | 이메일/비번 → JWT. demo 계정 (`demo@libra.local` / `demo1234`) prefill |
 | `/signup` | public | 회원가입 (8자+ 비번) |
 | `/dashboard` | required | KIS 키 등록, KIS 상태, 주문 안전장치, 시세 조회, portfolio snapshot, 주문 audit |
+| `/admin/backtests` | required | Claude committee 백테스트 실행/상태 관리. 기간과 판단 주기 지정 가능 |
+| `/backtests/kr-objective-2020-2023-opendart-googlenews` | required | 백테스트 검증 결과 표시 |
 
 ## 폴더 구조
 

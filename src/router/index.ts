@@ -34,6 +34,11 @@ const router = createRouter({
       component: () => import('@/pages/BacktestValidationPage.vue')
     },
     {
+      path: '/admin/backtests',
+      name: 'backtest-admin',
+      component: () => import('@/pages/BacktestAdminPage.vue')
+    },
+    {
       path: '/run/:threadId',
       name: 'run',
       component: () => import('@/pages/RunPage.vue')

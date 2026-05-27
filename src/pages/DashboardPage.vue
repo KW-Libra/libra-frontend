@@ -920,6 +920,12 @@ function formatUnknown(value: unknown) {
           >
             Public RSS
           </RouterLink>
+          <RouterLink
+            to="/admin/backtests"
+            class="inline-flex h-9 items-center rounded border border-gray-900 bg-gray-900 px-3 text-sm text-white hover:bg-black"
+          >
+            백테스트 관리
+          </RouterLink>
           <span class="text-xs text-gray-500" v-if="auth.user?.email">{{ auth.user.email }}</span>
           <button
             type="button"
@@ -1064,6 +1070,13 @@ function formatUnknown(value: unknown) {
                 class="mt-2 w-full border border-white/20 text-white text-sm font-medium py-2.5 rounded-md hover:bg-white/10 transition"
               >
                 검증 결과 보기
+              </button>
+              <button
+                type="button"
+                @click="router.push('/admin/backtests')"
+                class="mt-2 w-full border border-white/20 text-white text-sm font-medium py-2.5 rounded-md hover:bg-white/10 transition"
+              >
+                백테스트 실행 관리
               </button>
             </div>
             <div class="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5"></div>
