@@ -44,6 +44,246 @@ const frequencyOptions: Array<{ value: BacktestDecisionFrequency; label: string 
   { value: 'every-n-trading-days', label: 'N일마다' }
 ]
 
+const CUSTOM_VALUE = '__custom__'
+
+type SelectOption = {
+  value: string
+  label: string
+  description: string
+  badge?: string
+}
+
+type PeriodPreset = {
+  label: string
+  description: string
+  startDate: string
+  endDate: string
+}
+
+type RunPreset = {
+  label: string
+  description: string
+  model: string
+  governancePreset: string
+  promptVariant: string
+  executionPolicyMode: string
+  decisionFrequency: BacktestDecisionFrequency
+  decisionInterval: number
+  limit?: number
+  executionParticipationRate: string
+  executionMaxAbsDeltaPct: string
+}
+
+const modelSelection = ref(form.model || 'claude-haiku-4-5-20251001')
+const governanceSelection = ref(form.governancePreset || 'aggressive')
+const promptSelection = ref('default')
+const customModel = ref('')
+const customGovernance = ref('')
+const customPrompt = ref('')
+
+const modelOptions: SelectOption[] = [
+  {
+    value: 'claude-haiku-4-5-20251001',
+    label: 'Claude Haiku 4.5',
+    badge: '저비용',
+    description: '반복 실험과 부분 검증에 우선 사용합니다.'
+  },
+  {
+    value: 'claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
+    badge: '고비용',
+    description: '최종 검증용입니다. full run 전에 Haiku로 먼저 확인해야 합니다.'
+  },
+  {
+    value: CUSTOM_VALUE,
+    label: '직접 입력',
+    description: '새 모델명을 수동으로 넣어야 할 때만 사용합니다.'
+  }
+]
+
+const governanceOptions: SelectOption[] = [
+  {
+    value: 'aggressive',
+    label: 'Aggressive',
+    badge: '권장',
+    description: '현재 v2/risk-trim 검증 기본값입니다.'
+  },
+  {
+    value: 'balanced',
+    label: 'Balanced',
+    description: '신호 임계값을 중간 수준으로 둡니다.'
+  },
+  {
+    value: 'noise_resist',
+    label: 'Noise resist',
+    description: '작은 방향성 신호를 더 보수적으로 처리합니다.'
+  },
+  {
+    value: 'info_expand',
+    label: 'Info expand',
+    description: '정보성 에이전트 발화를 더 넓게 반영합니다.'
+  },
+  {
+    value: 'maximum_aggressive',
+    label: 'Maximum aggressive',
+    description: '충돌과 작은 신호도 더 적극적으로 반영합니다.'
+  },
+  {
+    value: 'default',
+    label: 'Default',
+    description: '회귀 테스트용 기본 임계값입니다.'
+  },
+  {
+    value: CUSTOM_VALUE,
+    label: '직접 입력',
+    description: '새 governance preset을 실험할 때만 사용합니다.'
+  }
+]
+
+const promptOptions: SelectOption[] = [
+  {
+    value: 'default',
+    label: 'Default',
+    badge: '권장',
+    description: '운영 기본 prompt입니다.'
+  },
+  {
+    value: 'calibrated',
+    label: 'Calibrated',
+    description: '보정 prompt variant입니다.'
+  },
+  {
+    value: CUSTOM_VALUE,
+    label: '직접 입력',
+    description: 'agent에 새 prompt variant가 추가된 경우만 사용합니다.'
+  }
+]
+
+const executionPolicyOptions: SelectOption[] = [
+  {
+    value: 'RISK_TRIM_AND_REDISTRIBUTE',
+    label: 'Risk trim + redistribute',
+    badge: 'v2 권장',
+    description: '위험/집중도 축소 신호를 underweight 종목 매수로 현금중립 보정합니다.'
+  },
+  {
+    value: 'POLICY_TARGET',
+    label: 'Policy target',
+    description: 'REBALANCE 신호가 나오면 policy weight 전체 목표로 이동합니다.'
+  },
+  {
+    value: 'PARTIAL_POLICY_TARGET',
+    label: 'Partial policy target',
+    description: 'policy target으로 participation 비율만큼 부분 이동합니다.'
+  },
+  {
+    value: 'DELTA_ONLY',
+    label: 'Delta only',
+    description: 'candidate delta만 실행합니다. v1 비교용입니다.'
+  }
+]
+
+const periodPresets: PeriodPreset[] = [
+  {
+    label: '2020-2023 전체',
+    description: '공식 987거래일 fixture',
+    startDate: '2020-01-02',
+    endDate: '2023-12-28'
+  },
+  {
+    label: '2020',
+    description: '초기 코로나 충격 포함',
+    startDate: '2020-01-02',
+    endDate: '2020-12-30'
+  },
+  {
+    label: '2021',
+    description: '회복/정상화 구간',
+    startDate: '2021-01-04',
+    endDate: '2021-12-30'
+  },
+  {
+    label: '2022',
+    description: '금리 상승/약세장 구간',
+    startDate: '2022-01-03',
+    endDate: '2022-12-29'
+  },
+  {
+    label: '2023',
+    description: '반등 구간',
+    startDate: '2023-01-02',
+    endDate: '2023-12-28'
+  }
+]
+
+const runPresets: RunPreset[] = [
+  {
+    label: 'v2 Risk-trim 공식',
+    description: 'Haiku + aggressive + risk-trim. 현재 권장 full/partial 실험값입니다.',
+    model: 'claude-haiku-4-5-20251001',
+    governancePreset: 'aggressive',
+    promptVariant: 'default',
+    executionPolicyMode: 'RISK_TRIM_AND_REDISTRIBUTE',
+    decisionFrequency: 'daily',
+    decisionInterval: 1,
+    executionParticipationRate: '',
+    executionMaxAbsDeltaPct: '5'
+  },
+  {
+    label: '빠른 smoke 20건',
+    description: '설정/키/로그만 확인할 때 사용합니다. full run 전에 먼저 누르기 좋습니다.',
+    model: 'claude-haiku-4-5-20251001',
+    governancePreset: 'aggressive',
+    promptVariant: 'default',
+    executionPolicyMode: 'RISK_TRIM_AND_REDISTRIBUTE',
+    decisionFrequency: 'daily',
+    decisionInterval: 1,
+    limit: 20,
+    executionParticipationRate: '',
+    executionMaxAbsDeltaPct: '5'
+  },
+  {
+    label: '주간 저비용',
+    description: '주 1회 판단으로 비용과 시간을 줄인 비교 실험입니다.',
+    model: 'claude-haiku-4-5-20251001',
+    governancePreset: 'balanced',
+    promptVariant: 'default',
+    executionPolicyMode: 'RISK_TRIM_AND_REDISTRIBUTE',
+    decisionFrequency: 'weekly',
+    decisionInterval: 1,
+    executionParticipationRate: '',
+    executionMaxAbsDeltaPct: '5'
+  },
+  {
+    label: 'Sonnet 최종 후보',
+    description: '고비용 최종 검증용입니다. Haiku full 결과가 정상일 때만 사용합니다.',
+    model: 'claude-sonnet-4-6',
+    governancePreset: 'aggressive',
+    promptVariant: 'default',
+    executionPolicyMode: 'RISK_TRIM_AND_REDISTRIBUTE',
+    decisionFrequency: 'daily',
+    decisionInterval: 1,
+    executionParticipationRate: '',
+    executionMaxAbsDeltaPct: '5'
+  }
+]
+
+const limitPresets: Array<{ label: string; value?: number; description: string }> = [
+  { label: '전체', value: undefined, description: '선택 기간 전체 실행' },
+  { label: '1건', value: 1, description: 'API/권한 smoke' },
+  { label: '20건', value: 20, description: '빠른 검증' },
+  { label: '100건', value: 100, description: '부분 성능 확인' }
+]
+
+const selectedModel = computed(() => optionLabel(modelOptions, modelSelection.value, form.model || ''))
+const selectedGovernance = computed(() =>
+  optionLabel(governanceOptions, governanceSelection.value, form.governancePreset || '')
+)
+const selectedPrompt = computed(() => optionLabel(promptOptions, promptSelection.value, form.promptVariant || 'default'))
+const selectedExecutionPolicy = computed(() =>
+  executionPolicyOptions.find((option) => option.value === form.executionPolicyMode)
+)
+
 const progressPct = computed(() => {
   const expected = status.value?.expectedRows ?? 0
   const raw = status.value?.rawRows ?? 0
@@ -60,7 +300,88 @@ const cadenceHint = computed(() => {
   return `${form.decisionInterval || 1}거래일마다 한 번 판단합니다.`
 })
 
+const periodSummary = computed(() => {
+  if (!form.startDate && !form.endDate) return 'fixture 전체 기간'
+  return `${form.startDate || 'fixture start'} → ${form.endDate || 'fixture end'}`
+})
+
+const limitSummary = computed(() => {
+  if (!form.limit) return '선택 기간 전체'
+  return `${formatNumber(form.limit)}개 판단만 실행`
+})
+
 onBeforeUnmount(stopPolling)
+
+function optionLabel(options: SelectOption[], selected: string, fallback: string) {
+  const option = options.find((item) => item.value === selected)
+  if (option) return option.label
+  return fallback || '-'
+}
+
+function selectModel(value: string = modelSelection.value) {
+  modelSelection.value = value
+  form.model = value === CUSTOM_VALUE ? customModel.value : value
+}
+
+function selectGovernance(value: string = governanceSelection.value) {
+  governanceSelection.value = value
+  form.governancePreset = value === CUSTOM_VALUE ? customGovernance.value : value
+}
+
+function selectPrompt(value: string = promptSelection.value) {
+  promptSelection.value = value
+  form.promptVariant = value === 'default' ? '' : value === CUSTOM_VALUE ? customPrompt.value : value
+}
+
+function syncCustomModel() {
+  if (modelSelection.value === CUSTOM_VALUE) {
+    form.model = customModel.value
+  }
+}
+
+function syncCustomGovernance() {
+  if (governanceSelection.value === CUSTOM_VALUE) {
+    form.governancePreset = customGovernance.value
+  }
+}
+
+function syncCustomPrompt() {
+  if (promptSelection.value === CUSTOM_VALUE) {
+    form.promptVariant = customPrompt.value
+  }
+}
+
+function applyRunPreset(preset: RunPreset) {
+  selectModel(preset.model)
+  selectGovernance(preset.governancePreset)
+  selectPrompt(preset.promptVariant)
+  form.executionPolicyMode = preset.executionPolicyMode
+  form.executionParticipationRate = preset.executionParticipationRate
+  form.executionMaxAbsDeltaPct = preset.executionMaxAbsDeltaPct
+  setFrequency(preset.decisionFrequency)
+  form.decisionInterval = preset.decisionInterval
+  form.limit = preset.limit
+  form.executionResolveTickerConflicts = true
+  form.issueStateEnabled = true
+  form.issueStateCooldownObservations = 20
+}
+
+function applyPeriodPreset(preset: PeriodPreset) {
+  form.startDate = preset.startDate
+  form.endDate = preset.endDate
+}
+
+function setLimit(value?: number) {
+  form.limit = value
+}
+
+function isLimitPresetActive(value?: number) {
+  return (form.limit || undefined) === value
+}
+
+function isPeriodPresetActive(preset: PeriodPreset) {
+  return form.startDate === preset.startDate && form.endDate === preset.endDate
+}
 
 async function startRun() {
   starting.value = true
@@ -242,48 +563,121 @@ function errorMessage(e: unknown, fallback: string) {
           </p>
         </div>
 
-        <form class="space-y-4" @submit.prevent="startRun">
-          <label class="block">
-            <span class="text-xs font-medium text-gray-600">Run ID</span>
-            <input v-model="form.runId" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" placeholder="비우면 자동 생성" />
-          </label>
+        <form class="space-y-5" @submit.prevent="startRun">
+          <div class="rounded border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+            서버에서 동시에 하나의 백테스트만 실행합니다. 이미 실행 중이면 새 run은 409로 거절됩니다.
+          </div>
 
-          <label class="block">
-            <span class="text-xs font-medium text-gray-600">Model</span>
-            <input v-model="form.model" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm font-mono" />
-          </label>
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-xs font-medium text-gray-600">추천 프리셋</span>
+              <span class="text-[11px] text-gray-500">클릭하면 주요 설정만 채웁니다.</span>
+            </div>
+            <div class="grid gap-2">
+              <button
+                v-for="preset in runPresets"
+                :key="preset.label"
+                class="rounded border border-gray-200 bg-white p-3 text-left transition hover:border-gray-900 hover:bg-gray-50"
+                type="button"
+                @click="applyRunPreset(preset)"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-sm font-semibold">{{ preset.label }}</span>
+                  <span v-if="preset.limit" class="rounded bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                    limit {{ preset.limit }}
+                  </span>
+                </div>
+                <p class="mt-1 text-xs leading-5 text-gray-500">{{ preset.description }}</p>
+              </button>
+            </div>
+          </div>
 
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-              <span class="text-xs font-medium text-gray-600">Governance</span>
-              <input v-model="form.governancePreset" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" />
-            </label>
-            <label class="block">
-              <span class="text-xs font-medium text-gray-600">Prompt</span>
-              <input v-model="form.promptVariant" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" placeholder="default" />
-            </label>
+          <div class="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
+            <div class="grid gap-3">
+              <label class="block">
+                <span class="text-xs font-medium text-gray-600">Model</span>
+                <select
+                  v-model="modelSelection"
+                  class="mt-1 h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm"
+                  @change="selectModel()"
+                >
+                  <option v-for="option in modelOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}{{ option.badge ? ` · ${option.badge}` : '' }}
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">
+                  {{ modelOptions.find((option) => option.value === modelSelection)?.description }}
+                </p>
+              </label>
+
+              <label v-if="modelSelection === CUSTOM_VALUE" class="block">
+                <span class="text-xs font-medium text-gray-600">직접 모델명</span>
+                <input
+                  v-model="customModel"
+                  class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm font-mono"
+                  placeholder="예: claude-haiku-4-5-20251001"
+                  @input="syncCustomModel"
+                />
+              </label>
+
+              <div class="grid grid-cols-2 gap-3">
+                <label class="block">
+                  <span class="text-xs font-medium text-gray-600">Governance</span>
+                  <select
+                    v-model="governanceSelection"
+                    class="mt-1 h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm"
+                    @change="selectGovernance()"
+                  >
+                    <option v-for="option in governanceOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}{{ option.badge ? ` · ${option.badge}` : '' }}
+                    </option>
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="text-xs font-medium text-gray-600">Prompt</span>
+                  <select
+                    v-model="promptSelection"
+                    class="mt-1 h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm"
+                    @change="selectPrompt()"
+                  >
+                    <option v-for="option in promptOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}{{ option.badge ? ` · ${option.badge}` : '' }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <label v-if="governanceSelection === CUSTOM_VALUE" class="block">
+                <span class="text-xs font-medium text-gray-600">직접 governance preset</span>
+                <input
+                  v-model="customGovernance"
+                  class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm font-mono"
+                  placeholder="새 preset 이름"
+                  @input="syncCustomGovernance"
+                />
+              </label>
+
+              <label v-if="promptSelection === CUSTOM_VALUE" class="block">
+                <span class="text-xs font-medium text-gray-600">직접 prompt variant</span>
+                <input
+                  v-model="customPrompt"
+                  class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm font-mono"
+                  placeholder="새 prompt variant"
+                  @input="syncCustomPrompt"
+                />
+              </label>
+            </div>
           </div>
 
           <label class="block">
             <span class="text-xs font-medium text-gray-600">Execution policy</span>
-            <select v-model="form.executionPolicyMode" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm">
-              <option value="RISK_TRIM_AND_REDISTRIBUTE">RISK_TRIM_AND_REDISTRIBUTE</option>
-              <option value="POLICY_TARGET">POLICY_TARGET</option>
-              <option value="PARTIAL_POLICY_TARGET">PARTIAL_POLICY_TARGET</option>
-              <option value="DELTA_ONLY">DELTA_ONLY</option>
+            <select v-model="form.executionPolicyMode" class="mt-1 h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm">
+              <option v-for="option in executionPolicyOptions" :key="option.value" :value="option.value">
+                {{ option.label }}{{ option.badge ? ` · ${option.badge}` : '' }}
+              </option>
             </select>
+            <p class="mt-1 text-xs leading-5 text-gray-500">{{ selectedExecutionPolicy?.description }}</p>
           </label>
-
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-              <span class="text-xs font-medium text-gray-600">Participation</span>
-              <input v-model="form.executionParticipationRate" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" placeholder="예: 0.5" />
-            </label>
-            <label class="block">
-              <span class="text-xs font-medium text-gray-600">Max delta %p</span>
-              <input v-model="form.executionMaxAbsDeltaPct" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" placeholder="예: 5" />
-            </label>
-          </div>
 
           <div>
             <span class="text-xs font-medium text-gray-600">판단 주기</span>
@@ -307,21 +701,64 @@ function errorMessage(e: unknown, fallback: string) {
             <input v-model.number="form.decisionInterval" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" min="2" type="number" />
           </label>
 
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-              <span class="text-xs font-medium text-gray-600">Start date</span>
-              <input v-model="form.startDate" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" type="date" />
-            </label>
-            <label class="block">
-              <span class="text-xs font-medium text-gray-600">End date</span>
-              <input v-model="form.endDate" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" type="date" />
-            </label>
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-xs font-medium text-gray-600">기간 프리셋</span>
+              <span class="text-[11px] text-gray-500">{{ periodSummary }}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                v-for="preset in periodPresets"
+                :key="preset.label"
+                class="rounded border p-2 text-left transition"
+                :class="isPeriodPresetActive(preset) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-900'"
+                type="button"
+                @click="applyPeriodPreset(preset)"
+              >
+                <div class="text-xs font-semibold">{{ preset.label }}</div>
+                <div class="mt-1 text-[11px]" :class="isPeriodPresetActive(preset) ? 'text-gray-200' : 'text-gray-500'">
+                  {{ preset.description }}
+                </div>
+              </button>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <label class="block">
+                <span class="text-xs font-medium text-gray-600">Start date</span>
+                <input v-model="form.startDate" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" type="date" />
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-600">End date</span>
+                <input v-model="form.endDate" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" type="date" />
+              </label>
+            </div>
           </div>
 
-          <label class="block">
-            <span class="text-xs font-medium text-gray-600">Limit</span>
-            <input v-model.number="form.limit" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" min="1" placeholder="비우면 선택 기간 전체" type="number" />
-          </label>
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-xs font-medium text-gray-600">Limit</span>
+              <span class="text-[11px] text-gray-500">{{ limitSummary }}</span>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                v-for="preset in limitPresets"
+                :key="preset.label"
+                class="h-9 rounded border px-2 text-xs font-medium transition"
+                :class="isLimitPresetActive(preset.value) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-900'"
+                :title="preset.description"
+                type="button"
+                @click="setLimit(preset.value)"
+              >
+                {{ preset.label }}
+              </button>
+            </div>
+            <input
+              v-model.number="form.limit"
+              class="mt-2 h-10 w-full rounded border border-gray-300 px-3 text-sm"
+              min="1"
+              placeholder="직접 입력. 비우면 선택 기간 전체"
+              type="number"
+            />
+          </div>
 
           <div class="space-y-2 rounded border border-gray-200 bg-gray-50 p-3">
             <label class="flex items-center justify-between gap-3 text-sm">
@@ -332,18 +769,46 @@ function errorMessage(e: unknown, fallback: string) {
               <span>issue state/cooldown 사용</span>
               <input v-model="form.issueStateEnabled" class="h-4 w-4" type="checkbox" />
             </label>
-            <label class="block text-sm">
-              <span class="text-xs font-medium text-gray-600">Cooldown observations</span>
-              <input v-model.number="form.issueStateCooldownObservations" class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm" min="1" type="number" />
-            </label>
-            <label class="flex items-center justify-between gap-3 text-sm">
-              <span>같은 runId 산출물 덮어쓰기</span>
-              <input v-model="form.force" class="h-4 w-4" type="checkbox" />
-            </label>
+          </div>
+
+          <details class="rounded border border-gray-200 bg-white p-3">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700">고급 옵션</summary>
+            <div class="mt-3 space-y-3">
+              <label class="block">
+                <span class="text-xs font-medium text-gray-600">Run ID</span>
+                <input v-model="form.runId" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm font-mono" placeholder="비우면 자동 생성" />
+              </label>
+
+              <div class="grid grid-cols-2 gap-3">
+                <label class="block">
+                  <span class="text-xs font-medium text-gray-600">Participation</span>
+                  <input v-model="form.executionParticipationRate" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" placeholder="예: 0.5" />
+                </label>
+                <label class="block">
+                  <span class="text-xs font-medium text-gray-600">Max delta %p</span>
+                  <input v-model="form.executionMaxAbsDeltaPct" class="mt-1 h-10 w-full rounded border border-gray-300 px-3 text-sm" placeholder="예: 5" />
+                </label>
+              </div>
+
+              <label class="block text-sm">
+                <span class="text-xs font-medium text-gray-600">Cooldown observations</span>
+                <input v-model.number="form.issueStateCooldownObservations" class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm" min="1" type="number" />
+              </label>
+
+              <label class="flex items-center justify-between gap-3 rounded border border-red-100 bg-red-50 p-3 text-sm text-red-800">
+                <span>같은 runId 산출물 덮어쓰기</span>
+                <input v-model="form.force" class="h-4 w-4" type="checkbox" />
+              </label>
+            </div>
+          </details>
+
+          <div class="rounded border border-gray-200 bg-gray-50 p-3 text-xs leading-5 text-gray-600">
+            <div><span class="font-semibold text-gray-800">선택값</span>: {{ selectedModel }} / {{ selectedGovernance }} / {{ selectedPrompt }}</div>
+            <div>Execution: {{ selectedExecutionPolicy?.label || form.executionPolicyMode }} · {{ cadenceHint }} · {{ limitSummary }}</div>
           </div>
 
           <button
-            class="h-10 w-full rounded bg-gray-900 px-4 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-400"
+            class="h-11 w-full rounded bg-gray-900 px-4 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-400"
             :disabled="starting"
             type="submit"
           >
