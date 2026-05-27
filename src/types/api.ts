@@ -287,3 +287,57 @@ export interface BacktestRunStatus {
   stdoutTail: string[]
   stderrTail: string[]
 }
+
+export interface BacktestRunConversation {
+  runId: string
+  selectedDate: string | null
+  days: BacktestRunDaySummary[]
+  conversation: BacktestRunDayConversation | null
+}
+
+export interface BacktestRunDaySummary {
+  date: string
+  decision: string | null
+  branch: string | null
+  agentCount: number | null
+  tradeCount: number | null
+  userActionRequired: boolean | null
+}
+
+export interface BacktestRunDayConversation {
+  date: string
+  query: string | null
+  model: string | null
+  finalDecision: BacktestRunFinalDecision
+  agents: BacktestRunAgentMessage[]
+  round2Agents: BacktestRunAgentMessage[]
+  executionPlan: Record<string, unknown>
+}
+
+export interface BacktestRunFinalDecision {
+  decision: string | null
+  branch: string | null
+  reasoning: string | null
+  userQuestion: string | null
+  trades: Array<Record<string, unknown>>
+}
+
+export interface BacktestRunAgentMessage {
+  agentId: string | null
+  opinion: string | null
+  verdict: string | null
+  confidence: number | null
+  direction: number | null
+  riskLevel: string | null
+  focusTickers: string[]
+  queryUnderstood: string | null
+  reasoning: string | null
+  limitsAcknowledged: string | null
+  tools: BacktestRunToolCall[]
+}
+
+export interface BacktestRunToolCall {
+  toolName: string | null
+  purpose: string | null
+  summary: string | null
+}

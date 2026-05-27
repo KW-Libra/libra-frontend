@@ -5,6 +5,8 @@ import { useRouter } from 'vue-router'
 import { backtestAdminApi } from '@/api/backtestAdmin'
 import type {
   BacktestDecisionFrequency,
+  BacktestRunAgentMessage,
+  BacktestRunConversation,
   BacktestRunStartRequest,
   BacktestRunStatus,
   ProblemDetail
@@ -35,6 +37,10 @@ const lookupRunId = ref('')
 const status = ref<BacktestRunStatus | null>(null)
 const starting = ref(false)
 const refreshing = ref(false)
+const conversation = ref<BacktestRunConversation | null>(null)
+const selectedConversationDate = ref('')
+const conversationLoading = ref(false)
+const conversationError = ref('')
 const error = ref('')
 let pollTimer: number | undefined
 
@@ -390,6 +396,8 @@ async function startRun() {
     const response = await backtestAdminApi.startRun(payload())
     status.value = response.data
     lookupRunId.value = response.data.runId
+    selectedConversationDate.value = ''
+    void loadConversation()
     syncPolling()
   } catch (e) {
     error.value = errorMessage(e, '백테스트 실행을 시작하지 못했습니다.')
@@ -407,9 +415,13 @@ async function refreshStatus() {
   refreshing.value = true
   error.value = ''
   try {
+    const previousRows = status.value?.rawRows ?? null
     const response = await backtestAdminApi.status(runId)
     status.value = response.data
     lookupRunId.value = response.data.runId
+    if (response.data.rawRows !== previousRows || !conversation.value) {
+      void loadConversation(selectedConversationDate.value || undefined, true)
+    }
     syncPolling()
   } catch (e) {
     error.value = errorMessage(e, '백테스트 상태를 불러오지 못했습니다.')
@@ -417,6 +429,33 @@ async function refreshStatus() {
   } finally {
     refreshing.value = false
   }
+}
+
+async function loadConversation(date?: string, silent = false) {
+  const runId = lookupRunId.value || status.value?.runId
+  if (!runId) {
+    if (!silent) conversationError.value = '조회할 runId가 없습니다.'
+    return
+  }
+  conversationLoading.value = true
+  if (!silent) conversationError.value = ''
+  try {
+    const response = await backtestAdminApi.conversation(runId, date)
+    conversation.value = response.data
+    selectedConversationDate.value = response.data.selectedDate || ''
+    conversationError.value = ''
+  } catch (e) {
+    if (!silent) {
+      conversationError.value = errorMessage(e, '일자별 대화를 불러오지 못했습니다.')
+    }
+  } finally {
+    conversationLoading.value = false
+  }
+}
+
+function selectConversationDate(date: string) {
+  selectedConversationDate.value = date
+  void loadConversation(date)
 }
 
 function payload(): BacktestRunStartRequest {
@@ -484,6 +523,33 @@ function setFrequency(value: BacktestDecisionFrequency) {
 function formatNumber(value: number | null | undefined) {
   if (value === null || value === undefined) return '-'
   return new Intl.NumberFormat('ko-KR').format(value)
+}
+
+function formatDecimal(value: number | null | undefined, digits = 2) {
+  if (value === null || value === undefined) return '-'
+  return new Intl.NumberFormat('ko-KR', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(value)
+}
+
+function formatJson(value: unknown) {
+  if (!value || (typeof value === 'object' && Object.keys(value as Record<string, unknown>).length === 0)) {
+    return '-'
+  }
+  return JSON.stringify(value, null, 2)
+}
+
+function agentName(agent: BacktestRunAgentMessage) {
+  return agent.agentId || 'unknown'
+}
+
+function toneForDecision(value: string | null | undefined) {
+  if (value === 'REBALANCE') return 'border-blue-200 bg-blue-50 text-blue-700'
+  if (value === 'USER_DECISION_REQUIRED') return 'border-amber-200 bg-amber-50 text-amber-700'
+  if (value === 'DEFER') return 'border-gray-200 bg-gray-50 text-gray-700'
+  if (value === 'HOLD') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  return 'border-gray-200 bg-white text-gray-600'
 }
 
 function formatBool(value: boolean | null | undefined) {
@@ -876,6 +942,149 @@ function errorMessage(e: unknown, fallback: string) {
               <div class="rounded border border-gray-200 bg-gray-50 p-3">
                 <div class="text-xs text-gray-500">ETA</div>
                 <div class="mt-1 text-sm font-semibold">{{ formatEta(status.eta) }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-gray-200 bg-white">
+            <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h3 class="text-base font-semibold">일자별 에이전트 대화</h3>
+                <p class="mt-1 text-xs text-gray-500">각 거래일 raw replay에 기록된 agent 응답과 최종 판단입니다.</p>
+              </div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  v-model="selectedConversationDate"
+                  class="h-10 min-w-44 rounded border border-gray-300 bg-white px-3 text-sm"
+                  @change="selectConversationDate(selectedConversationDate)"
+                >
+                  <option v-for="day in conversation?.days || []" :key="day.date" :value="day.date">
+                    {{ day.date }} · {{ day.decision || '-' }}
+                  </option>
+                </select>
+                <button
+                  class="h-10 rounded border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                  type="button"
+                  @click="loadConversation(selectedConversationDate || undefined)"
+                >
+                  {{ conversationLoading ? '불러오는 중' : '대화 새로고침' }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="conversationError" class="m-5 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {{ conversationError }}
+            </div>
+            <div v-else-if="!conversation?.conversation" class="p-8 text-center text-sm text-gray-500">
+              아직 표시할 일자별 대화가 없습니다.
+            </div>
+            <div v-else class="grid gap-0 xl:grid-cols-[280px_minmax(0,1fr)]">
+              <aside class="max-h-[760px] overflow-auto border-b border-gray-200 p-4 xl:border-b-0 xl:border-r">
+                <div class="space-y-2">
+                  <button
+                    v-for="day in conversation.days.slice().reverse()"
+                    :key="day.date"
+                    class="w-full rounded border p-3 text-left transition"
+                    :class="day.date === selectedConversationDate ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-900'"
+                    type="button"
+                    @click="selectConversationDate(day.date)"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="font-mono text-xs font-semibold">{{ day.date }}</span>
+                      <span class="rounded px-2 py-0.5 text-[11px] font-semibold" :class="day.date === selectedConversationDate ? 'bg-white/10 text-white' : toneForDecision(day.decision)">
+                        {{ day.decision || '-' }}
+                      </span>
+                    </div>
+                    <div class="mt-2 flex flex-wrap gap-2 text-[11px]" :class="day.date === selectedConversationDate ? 'text-gray-200' : 'text-gray-500'">
+                      <span>{{ day.branch || '-' }}</span>
+                      <span>{{ day.agentCount ?? 0 }} agents</span>
+                      <span>{{ day.tradeCount ?? 0 }} trades</span>
+                    </div>
+                  </button>
+                </div>
+              </aside>
+
+              <div class="max-h-[760px] overflow-auto p-5">
+                <div class="grid gap-3 lg:grid-cols-4">
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="text-xs text-gray-500">Date</div>
+                    <div class="mt-1 font-mono text-sm font-semibold">{{ conversation.conversation.date }}</div>
+                  </div>
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="text-xs text-gray-500">Decision</div>
+                    <div class="mt-1 w-fit rounded border px-2 py-0.5 text-xs font-semibold" :class="toneForDecision(conversation.conversation.finalDecision.decision)">
+                      {{ conversation.conversation.finalDecision.decision || '-' }}
+                    </div>
+                  </div>
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="text-xs text-gray-500">Branch</div>
+                    <div class="mt-1 break-all text-sm font-semibold">{{ conversation.conversation.finalDecision.branch || '-' }}</div>
+                  </div>
+                  <div class="rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="text-xs text-gray-500">Agents</div>
+                    <div class="mt-1 text-sm font-semibold">{{ conversation.conversation.agents.length }} / round2 {{ conversation.conversation.round2Agents.length }}</div>
+                  </div>
+                </div>
+
+                <div class="mt-4 rounded border border-gray-200 bg-gray-50 p-4">
+                  <div class="text-xs font-medium text-gray-500">Final Judge reasoning</div>
+                  <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-800">
+                    {{ conversation.conversation.finalDecision.reasoning || '-' }}
+                  </p>
+                  <div v-if="conversation.conversation.finalDecision.trades.length" class="mt-3">
+                    <div class="text-xs font-medium text-gray-500">Trades</div>
+                    <pre class="mt-2 max-h-44 overflow-auto rounded bg-white p-3 text-xs text-gray-700">{{ formatJson(conversation.conversation.finalDecision.trades) }}</pre>
+                  </div>
+                </div>
+
+                <div class="mt-4 rounded border border-gray-200 bg-white">
+                  <div class="border-b border-gray-200 px-4 py-3">
+                    <h4 class="text-sm font-semibold">Round 1 agent messages</h4>
+                  </div>
+                  <div class="divide-y divide-gray-200">
+                    <details v-for="agent in conversation.conversation.agents" :key="`${conversation.conversation.date}-${agent.agentId}`" class="group">
+                      <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 transition hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="font-mono text-sm font-semibold">{{ agentName(agent) }}</span>
+                          <span class="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium">{{ agent.opinion || '-' }}</span>
+                          <span class="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium">{{ agent.verdict || '-' }}</span>
+                        </div>
+                        <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+                          <span>conf {{ formatDecimal(agent.confidence) }}</span>
+                          <span>dir {{ formatDecimal(agent.direction) }}</span>
+                          <span>{{ agent.riskLevel || 'risk -' }}</span>
+                        </div>
+                      </summary>
+                      <div class="px-4 pb-4">
+                        <div class="grid gap-3 lg:grid-cols-[160px_minmax(0,1fr)]">
+                          <div class="text-xs text-gray-500">Focus</div>
+                          <div class="text-sm">{{ agent.focusTickers.join(', ') || '-' }}</div>
+                          <div class="text-xs text-gray-500">Query</div>
+                          <div class="whitespace-pre-wrap text-sm leading-6">{{ agent.queryUnderstood || '-' }}</div>
+                          <div class="text-xs text-gray-500">Reasoning</div>
+                          <div class="whitespace-pre-wrap text-sm leading-6">{{ agent.reasoning || '-' }}</div>
+                          <div v-if="agent.limitsAcknowledged" class="text-xs text-gray-500">Limits</div>
+                          <div v-if="agent.limitsAcknowledged" class="whitespace-pre-wrap text-sm leading-6 text-amber-700">{{ agent.limitsAcknowledged }}</div>
+                        </div>
+                        <div v-if="agent.tools.length" class="mt-3 rounded border border-gray-200 bg-gray-50 p-3">
+                          <div class="text-xs font-medium text-gray-500">Tool loop</div>
+                          <div class="mt-2 space-y-2">
+                            <div v-for="tool in agent.tools" :key="`${agent.agentId}-${tool.toolName}-${tool.summary}`" class="rounded bg-white p-2 text-xs leading-5 text-gray-700">
+                              <span class="font-mono font-semibold">{{ tool.toolName || '-' }}</span>
+                              <span v-if="tool.purpose"> · {{ tool.purpose }}</span>
+                              <div v-if="tool.summary" class="mt-1 text-gray-500">{{ tool.summary }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+
+                <div class="mt-4 rounded border border-gray-200 bg-gray-50 p-4">
+                  <div class="text-xs font-medium text-gray-500">Execution plan</div>
+                  <pre class="mt-2 max-h-72 overflow-auto rounded bg-white p-3 text-xs text-gray-700">{{ formatJson(conversation.conversation.executionPlan) }}</pre>
+                </div>
               </div>
             </div>
           </div>
