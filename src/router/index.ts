@@ -4,7 +4,12 @@ import { useAuthStore } from '@/stores/auth'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/dashboard' },
+    {
+      path: '/',
+      name: 'landing',
+      component: () => import('@/pages/LandingPage.vue'),
+      meta: { public: true }
+    },
     {
       path: '/login',
       name: 'login',
