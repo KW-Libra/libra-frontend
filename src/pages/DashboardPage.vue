@@ -287,10 +287,10 @@ async function saveCredentials() {
     appKey: credentialForm.appKey.trim(),
     appSecret: credentialForm.appSecret.trim(),
     accountNumber: credentialForm.accountNumber.trim(),
-    accountProductCode: credentialForm.accountProductCode.trim(),
+    accountProductCode: '01',
     htsId: credentialForm.htsId?.trim() || undefined
   }
-  if (!payload.appKey || !payload.appSecret || !payload.accountNumber || !payload.accountProductCode) {
+  if (!payload.appKey || !payload.appSecret || !payload.accountNumber) {
     errors.credentials = '필수 값을 입력하세요'
     return
   }
@@ -1209,16 +1209,6 @@ function formatUnknown(value: unknown) {
               maxlength="12"
               class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
               placeholder="12345678"
-            />
-          </label>
-          <label class="block lg:col-span-1">
-            <span class="text-xs text-gray-500">상품코드</span>
-            <input
-              v-model="credentialForm.accountProductCode"
-              inputmode="numeric"
-              maxlength="2"
-              class="mt-1 h-9 w-full rounded border border-gray-300 px-3 text-sm focus:border-gray-900 focus:outline-none"
-              placeholder="01"
             />
           </label>
           <label class="block lg:col-span-1">

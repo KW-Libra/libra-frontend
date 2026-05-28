@@ -20,7 +20,7 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: () => import('@/pages/DashboardPage.vue')
+      component: () => import('@/pages/DashboardPageJY.vue')
     },
     {
       path: '/backtests/public-rss-3y',

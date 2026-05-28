@@ -1,0 +1,73 @@
+:root {
+  /* HSL Colors: Terracotta Orange & Warm Charcoal */
+  /* === LIGHT MODE 기본값 (body 에 .dark-theme 클래스가 없을 때 사용) === */
+  --color-bg: hsl(38, 28%, 95%);            /* 따뜻한 크림 베이지 */
+  --color-bg-alt: hsl(38, 26%, 92%);
+  --color-card: #ffffff;
+  --color-card-active: #ffffff;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-hover: rgba(244, 117, 33, 0.3);
+  --color-border-focus: rgba(244, 117, 33, 0.5);
+
+  /* Typography Colors — LIGHT 모드 (진한 차콜 텍스트) */
+  --color-text-main: hsl(220, 15%, 13%);
+  --color-text-sub: hsl(220, 10%, 42%);
+  --color-text-light: hsl(220, 8%, 58%);
+
+  /* Accent Colors (Libra Terracotta & Amber) */
+  --color-primary: hsl(24, 85%, 50%);      /* 타오르는 테라코타 오렌지 */
+  --color-primary-light: hsl(24, 95%, 58%);
+  --color-primary-soft: rgba(244, 117, 33, 0.12);
+  --color-accent: hsl(38, 90%, 55%);       /* 럭셔리 골드/앰버 */
+  
+  /* Status Colors */
+  --color-success: hsl(145, 55%, 45%);     /* 활력 있는 에메랄드 그린 */
+  --color-success-soft: rgba(76, 175, 80, 0.12);
+  --color-warning: hsl(35, 80%, 50%);      
+  --color-warning-soft: rgba(255, 152, 0, 0.12);
+  --color-danger: hsl(0, 75%, 55%);        
+  --color-danger-soft: rgba(244, 67, 54, 0.12);
+
+  /* Shadows (다크 모드에 어울리는 소프트 드롭 섀도우) */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.7);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+
+  /* Font Stack */
+  --font-display: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Transitions */
+  --transition-fast: 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-normal: 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --transition-slow: 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.dark-theme {
+  /* Dark Mode - Midnight Warm Charcoal & Glowing Orange */
+  --color-bg: hsl(220, 15%, 10%);          /* 깊고 단단한 웜 차콜 */
+  --color-bg-alt: hsl(220, 12%, 13%);
+  --color-card: hsl(220, 12%, 14%);         /* 약간 밝은 질감의 카드 */
+  --color-card-active: hsl(220, 10%, 18%);
+  --color-border: hsla(220, 10%, 90%, 0.07);
+  --color-border-focus: hsla(24, 85%, 60%, 0.4);
+
+  --color-text-main: hsl(35, 20%, 90%);     /* 눈이 편안한 아이보리 화이트 */
+  --color-text-sub: hsl(220, 8%, 72%);
+  --color-text-light: hsl(220, 6%, 54%);
+
+  --color-primary: hsl(24, 85%, 55%);       /* 다크모드에서 빛나는 오렌지 */
+  --color-primary-light: hsl(24, 90%, 65%);
+  --color-primary-soft: hsla(24, 85%, 55%, 0.08);
+  --color-accent: hsl(38, 75%, 60%);
+  --color-accent-soft: hsl(38, 75%, 18%);
+
+  --color-success: hsl(150, 50%, 46%);
+  --color-success-soft: hsl(150, 50%, 14%);
+}

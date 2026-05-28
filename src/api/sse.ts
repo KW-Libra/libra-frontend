@@ -25,6 +25,9 @@ export interface RunStartBody {
   knowledge_base?: Record<string, unknown>
   ingest_bundle?: Record<string, unknown>
   knowledge_sources?: Record<string, unknown>
+  portfolio_definition?: Record<string, unknown>
+  trigger_event?: Record<string, unknown>
+  governance_v1?: Record<string, unknown>
   trigger?: 'pull' | 'push' | 'user_request'
   depth?: 'shallow' | 'medium' | 'deep'
   deadline_seconds?: number

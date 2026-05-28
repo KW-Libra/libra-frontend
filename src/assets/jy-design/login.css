@@ -1,0 +1,417 @@
+/* ==========================================================================
+   AURA // Single Sign-On CSS (Space Grotesk & WebGL Shader Base)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600&display=swap');
+
+#login-page {
+    /* 기존 SPA 레이아웃 규칙 준수 */
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: var(--transition-theme);
+    -webkit-font-smoothing: antialiased;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+/* ================= 디자인 테마 토큰 및 변수 ================= */
+#login-page {
+    --radius-pill: 999px;
+    --radius-card: 48px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 48px;
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-theme: background-color 0.6s var(--ease-out-expo), color 0.6s var(--ease-out-expo);
+    --transition-element: background-color 0.3s ease, transform 0.2s ease, opacity 0.3s ease;
+    
+    /* 기본 테마는 다크 모드 */
+    --bg-base: #030407; 
+    --bg-surface-1: rgba(10, 14, 23, 0.88); 
+    --bg-surface-2: rgba(255, 255, 255, 0.08); 
+    --bg-surface-3: rgba(255, 255, 255, 0.14);  
+    
+    --bg-accent: #FFFFFF; 
+    --bg-accent-hover: #E0EDFF;
+    
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.72);
+    --text-accent: #030407; 
+    --text-tech: rgba(255, 255, 255, 0.58);
+    --input-placeholder: rgba(255, 255, 255, 0.45);
+
+    --glow-color: 255, 255, 255;
+    --shader-core: #FFFFFF;
+    --shader-fringe: #4A88FF;
+}
+
+/* Light 테마 명시 */
+#login-page[data-theme="light"] {
+    --bg-base: #EEF2F6;
+    --bg-surface-1: rgba(255, 255, 255, 0.96);
+    --bg-surface-2: rgba(0, 0, 0, 0.075);
+    --bg-surface-3: rgba(0, 0, 0, 0.14);
+    
+    --bg-accent: #050608; 
+    --bg-accent-hover: #1A1E26;
+    
+    --text-primary: #050608;
+    --text-secondary: rgba(0, 0, 0, 0.75);
+    --text-accent: #FFFFFF;
+    --text-tech: rgba(0, 0, 0, 0.58);
+    --input-placeholder: rgba(0, 0, 0, 0.48);
+
+    --glow-color: 0, 0, 0;
+    --shader-core: #050608;
+    --shader-fringe: #8BA3CC;
+}
+
+/* ================= 레이아웃 구조 ================= */
+#webgl-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.layout-grid {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 100%;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    padding: 48px 48px 48px 80px;
+}
+
+/* ================= HUD 라벨 ================= */
+.tech-label {
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--text-tech);
+    text-transform: uppercase;
+    transition: var(--transition-theme);
+    z-index: 20;
+}
+
+.label-top-left { top: 48px; left: 48px; }
+.label-bottom-left { bottom: 48px; left: 48px; }
+
+.label-vertical-right {
+    top: 50%;
+    right: 48px;
+    transform: translateY(-50%) rotate(90deg);
+    transform-origin: center right;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+}
+
+.label-vertical-right::before, .label-vertical-right::after {
+    content: '[';
+    opacity: 0.5;
+}
+.label-vertical-right::after { content: ']'; }
+
+/* ================= 인증 패널 카드 ================= */
+.auth-wrapper {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+}
+
+.auth-panel {
+    width: 100%;
+    max-width: 580px;
+    background-color: var(--bg-surface-1);
+    border-radius: var(--radius-card);
+    padding: 68px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: var(--transition-theme);
+    border: 1px solid var(--bg-surface-2);
+}
+
+.header-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.system-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-primary);
+    background: var(--bg-surface-2);
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    align-self: flex-start;
+    margin-bottom: var(--space-sm);
+    letter-spacing: 0.1em;
+}
+
+#login-page h1 {
+    font-size: 42px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
+#login-page p.subtitle {
+    color: var(--text-secondary);
+    font-size: 18px;
+    font-weight: 400;
+}
+
+/* ================= 폼 & 인풋 필드 ================= */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-wrapper label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding-left: 16px;
+}
+
+#login-page input {
+    width: 100%;
+    padding: 0 28px;
+    height: 68px;
+    border: 1px solid transparent; 
+    outline: none; 
+    border-radius: var(--radius-pill); 
+    background-color: var(--bg-surface-2); 
+    color: var(--text-primary);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    transition: var(--transition-element);
+}
+
+#login-page input::placeholder {
+    color: var(--input-placeholder);
+}
+
+#login-page input:focus {
+    background-color: var(--bg-surface-3);
+    border-color: var(--bg-surface-3);
+}
+
+/* ================= SSO 소셜 로그인 ================= */
+.sso-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    color: var(--text-tech);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.sso-divider::before,
+.sso-divider::after {
+    content: "";
+    flex: 1;
+    height: 2px;
+    background-color: var(--bg-surface-2);
+    border-radius: var(--radius-pill);
+}
+
+.sso-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+}
+
+#login-page button {
+    border: none; 
+    outline: none; 
+    border-radius: var(--radius-pill); 
+    cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    transition: var(--transition-element);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-sso {
+    height: 68px;
+    background-color: var(--bg-surface-2); 
+    color: var(--text-primary);
+}
+
+.btn-sso:hover:not(:disabled) {
+    background-color: var(--bg-surface-3);
+    transform: translateY(-2px);
+}
+
+.btn-sso:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-sso i {
+    /* 아이콘 확대 (기존 24px) */
+    font-size: 28px;
+}
+
+/* ================= 메인 로그인 전송 버튼 ================= */
+.btn-primary {
+    height: 76px;
+    background-color: var(--bg-accent);
+    color: var(--text-accent);
+    font-size: 19px;
+    letter-spacing: 0.02em;
+    margin-top: var(--space-sm);
+    box-shadow: 0 0 40px rgba(var(--glow-color), 0.2);
+}
+
+.btn-primary:hover {
+    background-color: var(--bg-accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 0 60px rgba(var(--glow-color), 0.3);
+}
+
+.btn-primary i {
+    margin-left: 8px;
+    /* 아이콘 확대 (기존 20px) */
+    font-size: 22px;
+}
+
+/* ================= 상단 탑바 및 테마 토글 버튼 ================= */
+.top-bar {
+    position: absolute;
+    top: 48px;
+    right: 48px;
+    z-index: 20;
+    display: flex;
+    gap: 16px;
+}
+
+.theme-toggle {
+    height: 40px;
+    padding: 0 16px;
+    background-color: var(--bg-surface-1);
+    color: var(--text-primary);
+    gap: 8px;
+    font-size: 13px;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--bg-surface-2) !important;
+}
+
+.theme-toggle:hover {
+    background-color: var(--bg-surface-2);
+}
+
+.version-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+}
+
+/* ================= 회원가입 전환용 푸터 ================= */
+.auth-footer {
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px dashed var(--bg-surface-2);
+}
+
+.auth-foot-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.auth-foot-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid var(--bg-surface-2);
+    border-radius: var(--radius-pill);
+    background-color: var(--bg-surface-1);
+    transition: var(--transition-element);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-foot-link:hover {
+    background-color: var(--bg-surface-2);
+    transform: translateY(-1px);
+    border-color: var(--text-tech);
+}
+
+/* ================= 미디어 쿼리 (반응형) ================= */
+@media (max-width: 1024px) {
+    .layout-grid {
+        grid-template-columns: 1fr;
+        padding: var(--space-md);
+    }
+    .auth-wrapper {
+        grid-column: 1;
+        padding-right: 0;
+        justify-content: center; /* 모바일에서는 가로 가운데 정렬 */
+    }
+    .label-vertical-right {
+        display: none; 
+    }
+    .top-bar {
+        top: 24px;
+        right: 24px;
+    }
+    .label-top-left {
+        top: 24px;
+        left: 24px;
+    }
+    .auth-panel {
+        padding: 40px; /* 모바일에서는 패딩 다소 줄임 */
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #login-page * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
