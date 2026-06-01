@@ -379,11 +379,120 @@
 /* 주 시각화 레이아웃 */
 .primary-vis-layout {
   display: grid;
-  grid-template-columns: 1fr 1.25fr;
-  gap: 80px;                            /* 갭 확대 */
+  /* 좌: 자산 규모(큰 숫자) | 우: Portfolio Holdings — 비율 균등으로 시각 균형 */
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
   align-items: end;
   padding-bottom: 32px;
 }
+
+/* 좌측: 자산 규모 영역 (기존 그대로) */
+.primary-vis-asset {
+  min-width: 0;
+}
+
+/* 우측: Portfolio Holdings — 자산 규모와 같은 디자인 (카드 박스 없음, 단순 영역).
+   3행 max grid, 중앙 시작, 종목 늘면 왼쪽으로 column 확장. */
+.primary-vis-holdings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;     /* 중앙 정렬 */
+  gap: 12px;
+}
+
+.primary-vis-holdings .holdings-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+/* 타이틀: 베이스 .label 보다 키움 + bold */
+.primary-vis-holdings .holdings-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.primary-vis-holdings .holdings-count {
+  opacity: 0.5;
+  font-size: 13px;
+}
+
+/* Holdings 그리드 — column-flow 채우기, 3행 max. direction: rtl 트릭으로 첫 항목이 가장 오른쪽 */
+.holdings-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-columns: max-content;
+  row-gap: 20px;
+  column-gap: 48px;
+  justify-content: center;
+  direction: rtl;
+}
+
+/* 각 cell — 종목 정보(좌) + 비중/수익률(우).
+   info column에 min-width 부여해서 모든 row의 numbers 시작 위치를 동일하게 정렬. */
+.holding-row {
+  direction: ltr;
+  display: flex;
+  align-items: center;
+  gap: 20px;                 /* 종목과 비중 사이 거리 */
+}
+
+.holding-row .holding-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 150px;          /* 폰트 키우면서 함께 확장 */
+  flex: 0 0 auto;
+}
+.holding-row .holding-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  white-space: nowrap;
+}
+.dark-theme .holding-row .holding-name { color: #ffffff; }
+
+.holding-row .holding-ticker {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(13, 14, 16, 0.5);
+}
+.dark-theme .holding-row .holding-ticker { color: rgba(255, 255, 255, 0.5); }
+
+.holding-row .holding-numbers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.holding-row .holding-ratio {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  white-space: nowrap;
+}
+.dark-theme .holding-row .holding-ratio { color: #ffffff; }
+.holding-row .holding-target {
+  font-weight: 500;
+  opacity: 0.55;
+}
+.holding-row .holding-profit {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-light);
+}
+.holding-row .holding-profit.positive { color: #15803d; }
+.holding-row .holding-profit.danger   { color: #b91c1c; }
+.dark-theme .holding-row .holding-profit.positive { color: #4ade80; }
+.dark-theme .holding-row .holding-profit.danger   { color: #f87171; }
 
 /* CORE UTILIZATION - 94 디자인과 동일하게 촘촘한 도트 마스크 렌더링 */
 .dot-hero {
@@ -426,12 +535,12 @@
 
 .core-sub-value .label {
   color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .core-sub-value .value {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 18px;                      /* 14px -> 18px 증대 */
+  font-size: 20px;                      /* 14px -> 18px -> 20px 증대 */
   font-weight: 700;
   color: #ffffff;
   display: block;
@@ -649,7 +758,7 @@
 }
 
 .holding-ticker {
-  font-size: 11px;                      /* 9px -> 11px */
+  font-size: 13px;                      /* 9px -> 11px -> 13px */
   color: rgba(13, 14, 16, 0.5);
   font-weight: 500;
 }
@@ -1217,9 +1326,171 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   margin-bottom: 16px;
   padding-right: 4px;
 }
+
+/* 합의 과정 skip 버튼 — running view에서 시뮬레이션 중에만 노출. */
+.btn-skip-debate {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid rgba(210, 157, 85, 0.55);
+  color: #D29D55;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.btn-skip-debate:hover {
+  background: rgba(210, 157, 85, 0.12);
+  transform: translateX(2px);
+}
+.btn-skip-debate[hidden] { display: none; }
+.btn-skip-debate i { font-size: 13px; }
+
+/* === Success view: 위원회 대화록 아카이브 ============================ */
+/* 합의 과정 transcript가 빨리 지나가는 문제 해결.
+   시뮬레이션 종료 후 transcript-feed-area 내용을 이리로 복사. 기본은 collapsed. */
+.transcript-archive-section {
+  margin: 18px 0 14px;
+  padding: 14px 16px;
+  background: rgba(13, 14, 16, 0.025);
+  border: 1px solid rgba(13, 14, 16, 0.08);
+  border-radius: 12px;
+}
+.transcript-archive-section[hidden] { display: none; }
+.dark-theme .transcript-archive-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.transcript-archive-section .section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.archive-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.archive-hint {
+  font-size: 11px;
+  color: var(--color-text-light);
+  opacity: 0.75;
+  letter-spacing: 0.01em;
+}
+.dark-theme .archive-hint { color: rgba(255, 255, 255, 0.55); }
+.archive-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid rgba(210, 157, 85, 0.45);
+  color: #D29D55;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.archive-toggle-btn:hover { background: rgba(210, 157, 85, 0.10); }
+.archive-toggle-btn[aria-expanded="true"] .archive-toggle-icon {
+  transform: rotate(180deg);
+}
+.archive-toggle-icon { transition: transform 0.2s ease; }
+.transcript-archive-body {
+  margin-top: 14px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 12px 12px 8px;
+  background: rgba(13, 14, 16, 0.02);
+  border-radius: 8px;
+  border: 1px dashed rgba(13, 14, 16, 0.08);
+}
+.transcript-archive-body[hidden] { display: none; }
+.dark-theme .transcript-archive-body {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+/* 복사된 transcript bubble들이 자연스럽게 표시되도록 살짝 보정 */
+.transcript-archive-body .debate-bubble {
+  animation: none !important;
+  opacity: 1 !important;
+  margin-bottom: 10px;
+}
+.transcript-archive-body .debate-bubble.speaking { box-shadow: none; }
+
+/* Agent Visualize 상단 분석 종목 컨텍스트 바 — 모든 view(init/running/success/deadlock) 공통.
+   Dashboard 종목별 합의 패널에서 종목 row 클릭 시 노출. */
+.agent-subject-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(210, 157, 85, 0.08);
+  border: 1px solid rgba(210, 157, 85, 0.35);
+}
+.agent-subject-bar[hidden] { display: none; }
+.dark-theme .agent-subject-bar {
+  background: rgba(210, 157, 85, 0.12);
+  border-color: rgba(210, 157, 85, 0.4);
+}
+.agent-current-subject {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #D29D55;
+}
+.agent-current-subject-label {
+  text-transform: uppercase;
+  opacity: 0.75;
+  font-size: 9.5px;
+  letter-spacing: 0.10em;
+}
+.agent-current-subject-value {
+  font-size: 13.5px;
+  letter-spacing: 0.06em;
+}
+.agent-subject-clear {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--color-text-light);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.agent-subject-clear:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+.dark-theme .agent-subject-clear { color: rgba(255, 255, 255, 0.6); }
+.dark-theme .agent-subject-clear:hover { background: rgba(255, 255, 255, 0.08); }
 
 .transcript-header h3 {
   font-size: 0.78rem;
@@ -7779,5 +8050,1207 @@ body:not(:has(#dashboard-page:not(.hidden))) .notch-nav {
 }
 
 
+/* ======================================================================== */
+/* DECISION TRACEABILITY CHARTS (신규: 추적 가능성 시각화)
+   - Agent Consensus bar chart, Portfolio Value Trend line chart,
+     Compliance Status card.
+   - 발표 메시지("왜 그 결정인지 추적 가능")의 시각 증거.
+   - 라이트/다크 모드 동시 정의. 카드 내부 스크롤 없음 (자체 콘텐츠 고정 높이). */
+/* ======================================================================== */
+
+.chart-matrix {
+  display: grid;
+  grid-template-columns: 1.4fr 1.3fr 1fr;
+  gap: 20px;
+  margin-top: 36px;
+  min-height: 0;
+}
+
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 20px 22px 18px;
+  background: #faf7f1;
+  border: 1px solid rgba(13, 14, 16, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.dark-theme .chart-card {
+  background: #1d2025;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--monitor-fg);
+}
+
+.dark-theme .chart-card-header {
+  border-bottom-color: #ffffff;
+}
+
+.chart-card-title {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--monitor-fg);
+}
+
+.dark-theme .chart-card-title {
+  color: #ffffff;
+}
+
+.chart-card-badge {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #b8730d;
+}
+
+.dark-theme .chart-card-badge {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+
+.chart-card-badge.is-strong-consensus { background: rgba(34, 197, 94, 0.18); color: #14803c; }
+.dark-theme .chart-card-badge.is-strong-consensus { background: rgba(34, 197, 94, 0.22); color: #4ade80; }
+.chart-card-badge.is-weak-consensus { background: rgba(245, 158, 11, 0.18); color: #b8730d; }
+.dark-theme .chart-card-badge.is-weak-consensus { background: rgba(245, 158, 11, 0.22); color: #fbbf24; }
+.chart-card-badge.is-conflict { background: rgba(239, 68, 68, 0.18); color: #b91c1c; }
+.dark-theme .chart-card-badge.is-conflict { background: rgba(239, 68, 68, 0.22); color: #f87171; }
+.chart-card-badge.is-strong-hold { background: rgba(123, 144, 167, 0.22); color: #475569; }
+.dark-theme .chart-card-badge.is-strong-hold { background: rgba(123, 144, 167, 0.22); color: #94a3b8; }
+.chart-card-badge.is-pass { background: rgba(34, 197, 94, 0.18); color: #14803c; }
+.dark-theme .chart-card-badge.is-pass { background: rgba(34, 197, 94, 0.22); color: #4ade80; }
+.chart-card-badge.is-fail { background: rgba(239, 68, 68, 0.18); color: #b91c1c; }
+.dark-theme .chart-card-badge.is-fail { background: rgba(239, 68, 68, 0.22); color: #f87171; }
+
+.chart-card-badge-mono {
+  background: rgba(13, 14, 16, 0.08);
+  color: var(--color-text-main);
+}
+
+.dark-theme .chart-card-badge-mono {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.chart-card-subject {
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--color-text-sub);
+}
+
+.dark-theme .chart-card-subject {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.chart-card-body {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 160px;
+  margin-top: 12px;
+}
+
+.chart-card-body canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.chart-card-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dotted var(--monitor-border-light);
+}
+
+.dark-theme .chart-card-footer {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.chart-card-label {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-text-light);
+}
+
+.dark-theme .chart-card-label {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.chart-card-text {
+  margin-top: 6px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--color-text-main);
+}
+
+.dark-theme .chart-card-text {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.chart-card-footer-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-key {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-text-light);
+}
+
+.dark-theme .stat-key {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.stat-val {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
+.dark-theme .stat-val {
+  color: #ffffff;
+}
+
+.stat-val.positive { color: #15803d; }
+.dark-theme .stat-val.positive { color: #4ade80; }
+.stat-val.danger { color: #b91c1c; }
+.dark-theme .stat-val.danger { color: #f87171; }
+
+/* === Compliance card === */
+
+.chart-card-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 auto;
+  margin: 18px 0 14px;
+  font-size: 56px;
+  color: #15803d;
+}
+
+.dark-theme .chart-card-icon {
+  color: #4ade80;
+}
+
+.chart-card-icon.is-fail {
+  color: #b91c1c;
+}
+
+.dark-theme .chart-card-icon.is-fail {
+  color: #f87171;
+}
+
+.chart-compliance-list {
+  list-style: none;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+.compliance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px dotted var(--monitor-border-light);
+}
+
+.dark-theme .compliance-row {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.compliance-row:last-child {
+  border-bottom: none;
+}
+
+.compliance-rule {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-sub);
+}
+
+.dark-theme .compliance-rule {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.compliance-mark {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.compliance-mark.is-pass { color: #15803d; }
+.dark-theme .compliance-mark.is-pass { color: #4ade80; }
+.compliance-mark.is-fail { color: #b91c1c; }
+.dark-theme .compliance-mark.is-fail { color: #f87171; }
+
+/* === Responsive: 좁은 화면에선 1열로 === */
+@media (max-width: 1200px) {
+  .chart-matrix {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+
+/* ======================================================================== */
+/* DASHBOARD GRID (재배치: 한눈에 파악 가능한 위계)
+   - Row 1 (2 col): Portfolio Holdings + Portfolio Value Trend
+   - Row 2 (2 col): Agent Consensus + Agent Opinions
+   - Row 3 (1 wide col): Compliance (slim)
+   - 각 카드 상단에 .chart-card-help 부제 한 줄 — 사용자 설명. */
+/* ======================================================================== */
+
+/* ======================================================================== */
+/* DASHBOARD SUMMARY CARD (오늘의 AI 결정 한 줄 요약)
+   - 첫 화면 5초 인상 + 박서연 페르소나 친화 narrative.
+   - Dashboard-grid-main 위에 wide 한 줄로 배치.
+   - 골드 보더 + 친화적 톤. */
+/* ======================================================================== */
+
+.dashboard-grid-summary {
+  margin-top: 16px;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px 32px;
+  background: linear-gradient(135deg, rgba(210, 157, 85, 0.06), rgba(245, 158, 11, 0.04));
+  border: 1px solid rgba(210, 157, 85, 0.3);
+  border-radius: 18px;
+}
+
+.dark-theme .summary-card {
+  background: linear-gradient(135deg, rgba(210, 157, 85, 0.10), rgba(245, 158, 11, 0.06));
+  border-color: rgba(210, 157, 85, 0.4);
+}
+
+.summary-greeting {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--color-text-sub);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dark-theme .summary-greeting {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.summary-icon {
+  font-size: 22px;
+  color: #D29D55;
+}
+
+.summary-user-name {
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
+.dark-theme .summary-user-name {
+  color: #ffffff;
+}
+
+.summary-main {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: var(--color-text-main);
+}
+
+.dark-theme .summary-main {
+  color: #ffffff;
+}
+
+.summary-main-emoji {
+  margin-right: 8px;
+  font-size: 26px;
+}
+
+.summary-main-subject {
+  color: #D29D55;
+  font-weight: 700;
+}
+
+.summary-main-action {
+  font-weight: 700;
+}
+
+.summary-main-action.is-buy  { color: #15803d; }
+.summary-main-action.is-sell { color: #b91c1c; }
+.summary-main-action.is-hold { color: #64748b; }
+.dark-theme .summary-main-action.is-buy  { color: #4ade80; }
+.dark-theme .summary-main-action.is-sell { color: #f87171; }
+.dark-theme .summary-main-action.is-hold { color: #94a3b8; }
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px dotted rgba(210, 157, 85, 0.3);
+  border-bottom: 1px dotted rgba(210, 157, 85, 0.3);
+}
+
+.dark-theme .summary-stats {
+  border-color: rgba(210, 157, 85, 0.25);
+}
+
+.summary-stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-stat-label {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+}
+
+.dark-theme .summary-stat-label {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.summary-stat-value {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--color-text-main);
+}
+
+.dark-theme .summary-stat-value {
+  color: #ffffff;
+}
+
+.summary-stat-value.is-strong  { color: #15803d; }
+.summary-stat-value.is-weak    { color: #b8730d; }
+.summary-stat-value.is-conflict { color: #b91c1c; }
+.summary-stat-value.is-pass    { color: #15803d; }
+.summary-stat-value.is-fail    { color: #b91c1c; }
+.dark-theme .summary-stat-value.is-strong   { color: #4ade80; }
+.dark-theme .summary-stat-value.is-weak     { color: #fbbf24; }
+.dark-theme .summary-stat-value.is-conflict { color: #f87171; }
+.dark-theme .summary-stat-value.is-pass     { color: #4ade80; }
+.dark-theme .summary-stat-value.is-fail     { color: #f87171; }
+
+/* AI 투표 분포: 증가 / 유지 / 감소 */
+.summary-stat-value.summary-vote-breakdown {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.summary-vote-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.summary-vote-num {
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.summary-vote-tag {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+.summary-vote-sep {
+  color: var(--color-text-light);
+  opacity: 0.5;
+  font-weight: 400;
+}
+.summary-vote-item.is-increase { color: #15803d; }
+.summary-vote-item.is-hold     { color: #64748b; }
+.summary-vote-item.is-decrease { color: #b91c1c; }
+.dark-theme .summary-vote-item.is-increase { color: #4ade80; }
+.dark-theme .summary-vote-item.is-hold     { color: #94a3b8; }
+.dark-theme .summary-vote-item.is-decrease { color: #f87171; }
+
+/* === 종목별 합의 패널 ============================================== */
+/* summary 카드 안. 보유 종목 N개의 13명 위원회 합의를 한 화면에 표시.
+   메인 종목은 강조, row 클릭 시 Agent Visualize로 진입. */
+.summary-by-subject {
+  margin: 4px 0 6px;
+  padding: 12px 0 4px;
+  border-bottom: 1px dotted rgba(210, 157, 85, 0.3);
+}
+.dark-theme .summary-by-subject {
+  border-color: rgba(210, 157, 85, 0.25);
+}
+.summary-by-subject-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.summary-by-subject-title {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-text-light);
+}
+.dark-theme .summary-by-subject-title {
+  color: rgba(255, 255, 255, 0.55);
+}
+.summary-by-subject-hint {
+  font-size: 13px;
+  color: var(--color-text-light);
+  opacity: 0.7;
+}
+.dark-theme .summary-by-subject-hint {
+  color: rgba(255, 255, 255, 0.45);
+}
+.summary-by-subject-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.summary-subject-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 110px 130px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  outline: none;
+}
+.summary-subject-row:hover,
+.summary-subject-row:focus-visible {
+  background: rgba(210, 157, 85, 0.08);
+  transform: translateX(2px);
+}
+.dark-theme .summary-subject-row:hover,
+.dark-theme .summary-subject-row:focus-visible {
+  background: rgba(210, 157, 85, 0.12);
+}
+.summary-subject-row.is-main {
+  background: rgba(210, 157, 85, 0.10);
+  box-shadow: inset 3px 0 0 #D29D55;
+}
+.dark-theme .summary-subject-row.is-main {
+  background: rgba(210, 157, 85, 0.16);
+}
+.summary-subject-ticker {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dark-theme .summary-subject-ticker { color: #ffffff; }
+.summary-subject-main-mark {
+  color: #D29D55;
+  font-size: 14px;
+}
+.summary-subject-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+}
+.dark-theme .summary-subject-bar {
+  background: rgba(255, 255, 255, 0.08);
+}
+.summary-subject-seg { display: block; height: 100%; }
+.summary-subject-seg.is-increase { background: #15803d; }
+.summary-subject-seg.is-hold     { background: #94a3b8; }
+.summary-subject-seg.is-decrease { background: #b91c1c; }
+.dark-theme .summary-subject-seg.is-increase { background: #4ade80; }
+.dark-theme .summary-subject-seg.is-hold     { background: #94a3b8; }
+.dark-theme .summary-subject-seg.is-decrease { background: #f87171; }
+.summary-subject-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.summary-subject-counts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.summary-subject-counts .is-increase { color: #15803d; }
+.summary-subject-counts .is-hold     { color: #64748b; }
+.summary-subject-counts .is-decrease { color: #b91c1c; }
+.dark-theme .summary-subject-counts .is-increase { color: #4ade80; }
+.dark-theme .summary-subject-counts .is-hold     { color: #94a3b8; }
+.dark-theme .summary-subject-counts .is-decrease { color: #f87171; }
+.summary-subject-counts i { font-size: 12px; }
+.summary-subject-branch {
+  justify-self: end;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.summary-subject-branch.is-strong   { color: #15803d; background: rgba(21, 128, 61, 0.08); }
+.summary-subject-branch.is-weak     { color: #b8730d; background: rgba(184, 115, 13, 0.08); }
+.summary-subject-branch.is-conflict { color: #b91c1c; background: rgba(185, 28, 28, 0.08); }
+.dark-theme .summary-subject-branch.is-strong   { color: #4ade80; background: rgba(74, 222, 128, 0.12); }
+.dark-theme .summary-subject-branch.is-weak     { color: #fbbf24; background: rgba(251, 191, 36, 0.12); }
+.dark-theme .summary-subject-branch.is-conflict { color: #f87171; background: rgba(248, 113, 113, 0.12); }
+/* STRONG_HOLD는 weak처럼 처리되지만 라벨이 다르므로 별도 키 필요 시 추가 */
+
+@media (max-width: 800px) {
+  .summary-subject-row {
+    grid-template-columns: 56px 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 4px;
+  }
+  .summary-subject-counts { grid-column: 2; }
+  .summary-subject-branch { grid-column: 2; justify-self: start; }
+}
+
+.summary-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+}
+
+.summary-btn-primary {
+  background: #D29D55;
+  color: #ffffff;
+  border-color: #D29D55;
+}
+
+.summary-btn-primary:hover {
+  background: #b8843e;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(210, 157, 85, 0.35);
+}
+
+.summary-btn-secondary {
+  background: transparent;
+  color: var(--color-text-main);
+  border-color: rgba(13, 14, 16, 0.18);
+}
+
+.summary-btn-secondary:hover {
+  background: rgba(13, 14, 16, 0.04);
+  border-color: rgba(13, 14, 16, 0.3);
+}
+
+.dark-theme .summary-btn-secondary {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark-theme .summary-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+@media (max-width: 800px) {
+  .summary-main { font-size: 22px; }
+  .summary-stats { grid-template-columns: 1fr; }
+}
+
+
+/* MAIN: Z3 + Z4 (에이전트 중심). Consensus : Opinions = 1 : 1.6 */
+.dashboard-grid-main {
+  display: grid;
+  /* Consensus(가장 큰 시각화) | Opinions(중간) | Compliance(좁은 사이드) */
+  grid-template-columns: 1.6fr 1fr 1fr;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-grid-main {
+    grid-template-columns: 1fr 1fr;
+  }
+  .chart-card-compliance-narrow {
+    grid-column: 1 / -1;
+  }
+}
+
+/* SUB: Z2 Trend (가로 전체). Z1 Holdings는 hero 영역으로 승격됨 (2026-05-28) */
+.dashboard-grid-sub {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  margin-top: 24px;
+}
+
+/* WIDE: 더 이상 사용 안 함 — Compliance가 main grid 우측으로 이동 (2026-05-28) */
+.dashboard-grid-wide {
+  display: none;
+}
+
+/* Legacy .dashboard-grid (다른 곳에서 안 쓰면 dead, 호환 위해 유지) */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(260px, auto);
+  gap: 28px;
+  margin-top: 16px;
+}
+
+.chart-card-wide {
+  width: 100%;
+}
+
+/* ===== 메인 카드 (Z3, Z4) — 금색 좌측 띠 제거(2026-05-28). 강조는 그리드 비율로 처리 ===== */
+.chart-card-main {
+  /* border-left 없음 */
+}
+
+/* ===== 클릭 가능 카드 (data-nav 속성) ===== */
+.chart-card[data-nav] {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.chart-card[data-nav]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(13, 14, 16, 0.10);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.dark-theme .chart-card[data-nav]:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.40);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+/* canvas 위에서도 클릭이 카드 핸들러까지 전파되도록 (chart 인터랙션은 손해 보지만 시연용엔 OK) */
+.chart-card[data-nav] canvas {
+  pointer-events: none;
+}
+
+/* "→ 상세 보기" 힌트 */
+.chart-card-hint {
+  display: inline-block;
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #b8730d;
+}
+
+.dark-theme .chart-card-hint {
+  color: #fbbf24;
+}
+
+/* opinion row도 클릭 가능 */
+.agent-opinion-row {
+  cursor: pointer;
+}
+
+
+/* ======================================================================== */
+/* AMC VOTE HISTORY SPARK
+   - 각 AMC 카드 안에 agent의 최근 10 vote 분포 가로 stacked bar.
+   - INCREASE(초록) / HOLD(회색) / DECREASE(빨강).
+   - amc-action-block 다음에 JS 동적 삽입. */
+/* ======================================================================== */
+
+.amc-vote-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dotted rgba(13, 14, 16, 0.12);
+}
+
+.dark-theme .amc-vote-row {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.amc-vote-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.amc-vote-lbl {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  color: var(--color-text-light);
+  text-transform: uppercase;
+}
+
+.dark-theme .amc-vote-lbl {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.amc-vote-total {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+}
+
+.dark-theme .amc-vote-total {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.amc-vote-spark {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(13, 14, 16, 0.05);
+}
+
+.dark-theme .amc-vote-spark {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.amc-vote-seg {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.amc-vote-seg.is-increase { background: #22c55e; }
+.amc-vote-seg.is-hold     { background: #7b90a7; }
+.amc-vote-seg.is-decrease { background: #ef4444; }
+
+.dark-theme .amc-vote-seg.is-increase { background: #4ade80; }
+.dark-theme .amc-vote-seg.is-hold     { background: #94a3b8; }
+.dark-theme .amc-vote-seg.is-decrease { background: #f87171; }
+
+.amc-vote-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  gap: 8px;
+}
+
+.amc-vote-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-sub);
+}
+
+.dark-theme .amc-vote-legend-item {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.amc-vote-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.amc-vote-legend-dot.is-increase { background: #22c55e; }
+.amc-vote-legend-dot.is-hold     { background: #7b90a7; }
+.amc-vote-legend-dot.is-decrease { background: #ef4444; }
+
+.dark-theme .amc-vote-legend-dot.is-increase { background: #4ade80; }
+.dark-theme .amc-vote-legend-dot.is-hold     { background: #94a3b8; }
+.dark-theme .amc-vote-legend-dot.is-decrease { background: #f87171; }
+
+.chart-card-help {
+  margin: 6px 0 10px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--color-text-sub);
+}
+
+.chart-card-help strong {
+  color: var(--color-text-main);
+  font-weight: 700;
+}
+
+.dark-theme .chart-card-help {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dark-theme .chart-card-help strong {
+  color: #ffffff;
+}
+
+/* === Z1: Portfolio holdings ===
+   - 자산 늘면 카드가 늘어남 (내부 스크롤 X — 사용자 요청).
+   - .chart-card 기본 overflow:hidden을 visible로 오버라이드. */
+
+.chart-card-portfolio {
+  overflow: visible;
+}
+
+.zone-data-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* 스크롤 없음 — 콘텐츠 따라 카드 늘어남 */
+}
+
+.portfolio-stat-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 6px 0 14px;
+  padding: 12px 0;
+  border-top: 1px dotted var(--monitor-border-light);
+  border-bottom: 1px dotted var(--monitor-border-light);
+}
+
+.dark-theme .portfolio-stat-bar {
+  border-top-color: rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.portfolio-stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.portfolio-stat-key {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-text-light);
+}
+
+.dark-theme .portfolio-stat-key {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.portfolio-stat-val {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  line-height: 1.1;
+}
+
+.dark-theme .portfolio-stat-val {
+  color: #ffffff;
+}
+
+.portfolio-stat-val.positive { color: #15803d; }
+.dark-theme .portfolio-stat-val.positive { color: #4ade80; }
+.portfolio-stat-val.danger { color: #b91c1c; }
+.dark-theme .portfolio-stat-val.danger { color: #f87171; }
+
+/* === Z4: Agent Opinions list === */
+
+.agent-opinions-list {
+  list-style: none;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-opinions-list::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.agent-opinion-row {
+  padding: 10px 12px;
+  background: rgba(13, 14, 16, 0.03);
+  border-left: 3px solid #7b90a7;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.agent-opinion-row:hover {
+  background: rgba(13, 14, 16, 0.06);
+}
+
+.dark-theme .agent-opinion-row {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dark-theme .agent-opinion-row:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.agent-opinion-row.is-increase { border-left-color: #22c55e; }
+.agent-opinion-row.is-decrease { border-left-color: #ef4444; }
+.agent-opinion-row.is-hold     { border-left-color: #7b90a7; }
+
+.agent-opinion-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.agent-opinion-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-opinion-name {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-main);
+}
+
+.dark-theme .agent-opinion-name {
+  color: #ffffff;
+}
+
+.agent-opinion-team {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(13, 14, 16, 0.08);
+  color: var(--color-text-sub);
+  text-transform: uppercase;
+}
+
+.dark-theme .agent-opinion-team {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.agent-opinion-verdict {
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.agent-opinion-verdict.is-increase { color: #15803d; }
+.dark-theme .agent-opinion-verdict.is-increase { color: #4ade80; }
+.agent-opinion-verdict.is-decrease { color: #b91c1c; }
+.dark-theme .agent-opinion-verdict.is-decrease { color: #f87171; }
+.agent-opinion-verdict.is-hold { color: #64748b; }
+.dark-theme .agent-opinion-verdict.is-hold { color: #94a3b8; }
+
+.agent-opinion-conf {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: 'JetBrains Mono', var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-light);
+}
+
+.dark-theme .agent-opinion-conf {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.agent-opinion-rationale {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--color-text-sub);
+}
+
+.dark-theme .agent-opinion-rationale {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* === Z5: Compliance — 가로 슬림 (icon + list 좌우 배치) === */
+
+.compliance-row-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* 좁은 카드 레이아웃 — main grid 3열 중 우측에 들어갈 때 (가로 → 세로 stack) */
+.chart-card-compliance-narrow .compliance-narrow-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+.chart-card-compliance-narrow .chart-card-icon {
+  font-size: 36px;
+  color: #15803d;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.dark-theme .chart-card-compliance-narrow .chart-card-icon { color: #4ade80; }
+.chart-card-compliance-narrow .chart-card-icon.is-fail { color: #b91c1c; }
+.dark-theme .chart-card-compliance-narrow .chart-card-icon.is-fail { color: #f87171; }
+
+/* list 자체가 보이도록 base 스타일(flex:1 1 0 / min-height:0 / overflow:hidden) 풀어줌.
+   좁은 카드에선 자식 높이를 그대로 갖고 column 방향으로 자연스럽게 stacking. */
+.chart-card-compliance-narrow .chart-compliance-list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+/* 좁은 카드의 row — rule + detail 가로 인라인 + mark 우측 끝. 좁으면 wrap. */
+.chart-card-compliance-narrow .compliance-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 8px 4px;
+  border-bottom: 1px dotted var(--monitor-border-light);
+}
+.dark-theme .chart-card-compliance-narrow .compliance-row {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+.chart-card-compliance-narrow .compliance-row:last-child { border-bottom: none; }
+.chart-card-compliance-narrow .compliance-rule {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.chart-card-compliance-narrow .compliance-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-sans, inherit);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--color-text-sub);
+  line-height: 1.4;
+  word-break: keep-all;
+}
+.dark-theme .chart-card-compliance-narrow .compliance-detail {
+  color: rgba(255, 255, 255, 0.65);
+}
+.chart-card-compliance-narrow .compliance-mark {
+  font-size: 16px;
+  font-weight: 800;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.chart-card-wide .chart-card-icon {
+  margin: 0;
+  font-size: 44px;
+}
+
+.chart-card-wide .chart-compliance-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  overflow: visible;
+}
+
+.chart-card-wide .compliance-row {
+  border-bottom: none;
+  padding: 6px 0;
+  background: rgba(13, 14, 16, 0.03);
+  border-left: 3px solid #22c55e;
+  border-radius: 4px;
+  padding-left: 10px;
+}
+
+.dark-theme .chart-card-wide .compliance-row {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* === Responsive === */
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .chart-card-wide .chart-compliance-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
 

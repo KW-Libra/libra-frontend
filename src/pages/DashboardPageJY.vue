@@ -15,6 +15,7 @@ import type {
   KisStatus,
   PortfolioSnapshot
 } from '@/types/api'
+import type { RunEvent } from '@/types/events'
 
 type Level = 0 | 1 | 2 | 3 | 4
 type Tone = 'positive' | 'danger' | 'neutral'
@@ -23,6 +24,81 @@ type AgentSubtab = 'settings' | 'visualize' | 'history'
 type AgentViewState = 'init' | 'running' | 'success' | 'deadlock'
 type FlowNodeKey = 'core' | 'risk' | 'macro' | 'cost' | 'news' | 'mediator' | 'judge'
 type StrategicModeKey = 'conservative' | 'balanced' | 'aggressive'
+type VoteDirection = 'INCREASE' | 'HOLD' | 'DECREASE'
+type AssetClassKey = 'EQUITY' | 'BOND' | 'ALT' | 'CASH'
+type AgentCompletedRunEvent = Extract<RunEvent, { event: 'agent_completed' }>
+
+interface PortfolioHoldingCard {
+  key: string
+  ticker: string
+  name: string
+  weightPct: number
+  targetPct: number
+  valueLabel: string
+  profitLabel: string
+  tone: Tone
+  assetClass: AssetClassKey
+}
+
+interface FlowNodeMeta {
+  title: string
+  idle: string
+  active: string
+  complete: string
+  agents: string[]
+}
+
+const FLOW_NODE_META: Record<FlowNodeKey, FlowNodeMeta> = {
+  core: {
+    title: 'CORE COUNCIL',
+    idle: 'Session control',
+    active: 'Orchestrating',
+    complete: 'Session routed',
+    agents: ['Compliance', 'Round 1']
+  },
+  risk: {
+    title: 'RISK LAYER',
+    idle: 'Risk / Liquidity / Technical',
+    active: 'Checking risk gates',
+    complete: 'Risk checked',
+    agents: ['Risk', 'Liquidity', 'Technical']
+  },
+  macro: {
+    title: 'RETURN LAYER',
+    idle: 'Profit / Macro / ESG',
+    active: 'Scoring return signals',
+    complete: 'Return checked',
+    agents: ['Profit', 'Macro', 'ESG']
+  },
+  cost: {
+    title: 'EXECUTION LAYER',
+    idle: 'Cost / Tax / Execution',
+    active: 'Validating execution',
+    complete: 'Execution checked',
+    agents: ['Cost', 'Tax', 'Execution']
+  },
+  news: {
+    title: 'EVIDENCE LAYER',
+    idle: 'News / Disclosure / Report',
+    active: 'Reading evidence',
+    complete: 'Evidence checked',
+    agents: ['Disclosure', 'News', 'Report']
+  },
+  mediator: {
+    title: 'MEDIATOR JUDGE',
+    idle: 'Conflict routing',
+    active: 'Resolving conflicts',
+    complete: 'Conflict resolved',
+    agents: ['Mediator']
+  },
+  judge: {
+    title: 'FINAL JUDGE',
+    idle: 'Final approval',
+    active: 'Approving strategy',
+    complete: 'Decision issued',
+    agents: ['Final Judge']
+  }
+}
 
 const DEMO_TOTAL_VALUE = 142_500_000
 const DEMO_TOTAL_PROFIT = 16_840_000
@@ -100,12 +176,37 @@ const STRATEGIC_MODES: Array<{
   }
 ]
 
+const DEMO_DECISION_VOTES: Array<{ direction: VoteDirection; count: number; label: string; tone: string }> = [
+  { direction: 'INCREASE', count: 2, label: 'INCREASE', tone: 'is-increase' },
+  { direction: 'HOLD', count: 6, label: 'HOLD', tone: 'is-hold' },
+  { direction: 'DECREASE', count: 5, label: 'DECREASE', tone: 'is-decrease' }
+]
+
+const DEMO_AGENT_OPINIONS: Array<{
+  id: string
+  name: string
+  team: string
+  direction: VoteDirection
+  confidence: number
+  rationale: string
+}> = [
+  { id: 'risk', name: 'Risk', team: 'domain', direction: 'DECREASE', confidence: 0.78, rationale: '집중도와 변동성 한도를 먼저 확인해 초과 비중 축소를 권고합니다.' },
+  { id: 'technical', name: 'Technical', team: 'domain', direction: 'DECREASE', confidence: 0.63, rationale: '최근 가격 모멘텀과 drawdown 지표 기준으로 추격 매수보다 확인이 필요합니다.' },
+  { id: 'news', name: 'News', team: 'evidence', direction: 'HOLD', confidence: 0.59, rationale: '뉴스 본문 기준 강한 악재는 없어 즉시 매도 신호로 보지는 않습니다.' },
+  { id: 'disclosure', name: 'Disclosure', team: 'evidence', direction: 'HOLD', confidence: 0.55, rationale: '공시 근거에서 투자 가정을 크게 바꿀 이벤트는 제한적입니다.' },
+  { id: 'report', name: 'Report', team: 'evidence', direction: 'HOLD', confidence: 0.52, rationale: '리포트 근거는 중립이며 목표 비중 복귀 여부는 실행 정책에 위임합니다.' },
+  { id: 'profit', name: 'Profit', team: 'core', direction: 'INCREASE', confidence: 0.58, rationale: '기간 성과와 포트폴리오 기여도가 양호해 winner를 완전히 자르지 않습니다.' },
+  { id: 'cost', name: 'Cost', team: 'execution', direction: 'HOLD', confidence: 0.74, rationale: '거래비용 대비 효과가 작으면 confirmation gate에서 보류합니다.' },
+  { id: 'final', name: 'Final Judge', team: 'judge', direction: 'HOLD', confidence: 0.69, rationale: '강한 신호보다 residual drift 확인 후 저빈도 조정을 우선합니다.' }
+]
+
 const router = useRouter()
 const auth = useAuthStore()
 const runStream = useRunStreamStore()
 
 const status = ref<KisStatus | null>(null)
 const balance = ref<KisBalance | null>(null)
+const snapshotBalance = ref<KisBalance | null>(null)
 const snapshots = ref<PortfolioSnapshot[]>([])
 const audits = ref<KisOrderAudit[]>([])
 const quote = ref<KisQuote | null>(null)
@@ -119,6 +220,9 @@ const activeLanguage = ref<'KO' | 'EN'>('KO')
 const isDarkTheme = ref(true)
 const selectedStrategicMode = ref<StrategicModeKey>('balanced')
 const riskScore = ref(5.5)
+const selectedDashboardSubject = ref<string | null>(null)
+const terminalCenterView = ref<'overview' | 'calendar'>('overview')
+const terminalAssetNav = ref<'main' | 'equities' | 'fixed' | 'crypto' | 'calendar'>('main')
 
 const pageNotice = ref('')
 const pageError = ref('')
@@ -149,8 +253,9 @@ const now = ref(new Date())
 const agentRunStartedAt = ref<number | null>(null)
 let clockTimer: number | undefined
 
-const visibleSummary = computed(() => balance.value?.summary ?? snapshots.value[0] ?? null)
-const holdings = computed(() => balance.value?.holdings ?? [])
+const latestSnapshot = computed(() => snapshots.value[0] ?? null)
+const visibleSummary = computed(() => balance.value?.summary ?? snapshotBalance.value?.summary ?? latestSnapshot.value ?? null)
+const holdings = computed(() => balance.value?.holdings ?? snapshotBalance.value?.holdings ?? [])
 const totalValue = computed(() => toNumber(visibleSummary.value?.totalValuationAmount) ?? 0)
 const totalProfit = computed(() => toNumber(visibleSummary.value?.profitLossAmount) ?? 0)
 const totalProfitRate = computed(() => toNumber(visibleSummary.value?.profitLossRate) ?? 0)
@@ -159,6 +264,12 @@ const cashWeight = computed(() => (totalValue.value > 0 ? cashValue.value / tota
 const displayTotalValue = computed(() => (totalValue.value > 0 ? totalValue.value : DEMO_TOTAL_VALUE))
 const displayTotalProfit = computed(() => (totalValue.value > 0 ? totalProfit.value : DEMO_TOTAL_PROFIT))
 const hasExecutablePortfolio = computed(() => holdings.value.length > 0)
+const portfolioDataSource = computed(() => {
+  if (balance.value) return 'KIS LIVE'
+  if (snapshotBalance.value) return 'SNAPSHOT'
+  if (latestSnapshot.value) return 'SNAPSHOT SUMMARY'
+  return 'DEMO'
+})
 const brokerLabel = computed(() => {
   if (!status.value) return '확인 중'
   if (!status.value.registered) return '자격증명 미등록'
@@ -184,8 +295,6 @@ const agentClockText = computed(() => {
   return `${String(hour12).padStart(2, '0')}.${String(minutes).padStart(2, '0')} ${period}`
 })
 
-const heroValue = computed(() => formatMoney(displayTotalValue.value))
-const profitClass = computed(() => (displayTotalProfit.value >= 0 ? 'positive' : 'danger'))
 const runButtonText = computed(() => (runStream.isStreaming ? '실행 중' : '리밸런스 실행'))
 const committeeState = computed(() => {
   if (runStream.isStreaming) return 'STREAMING'
@@ -204,6 +313,84 @@ const agentViewState = computed<AgentViewState>(() => {
 
 const latestStreamEvent = computed(() => [...runStream.timelineEvents].reverse()[0] ?? null)
 const visibleTimelineEvents = computed(() => compactVisibleEvents(runStream.timelineEvents))
+const agentCompletedEvents = computed(() =>
+  runStream.events.filter((event): event is AgentCompletedRunEvent => event.event === 'agent_completed')
+)
+const latestAgentCompletedEvents = computed(() => {
+  const byAgent = new Map<string, AgentCompletedRunEvent>()
+  agentCompletedEvents.value.forEach((event) => {
+    byAgent.set(event.data.agent_id || `agent-${byAgent.size}`, event)
+  })
+  return Array.from(byAgent.values())
+})
+const latestFinalDecision = computed(() => {
+  const draft = [...runStream.events].reverse().find((event) => event.event === 'final_decision_draft')
+  if (draft?.event === 'final_decision_draft') {
+    return {
+      decision: draft.data.decision || '',
+      branch: draft.data.branch || '',
+      summary: draft.data.summary || draft.data.reasoning || ''
+    }
+  }
+  if (runStream.completion) {
+    return {
+      decision: runStream.completion.decision || '',
+      branch: runStream.completion.branch || '',
+      summary: runStream.completion.run_status || ''
+    }
+  }
+  return null
+})
+const councilFlowState = computed(() => {
+  const state = {
+    completedAgents: new Map<FlowNodeKey, string[]>(),
+    activeAgents: new Map<FlowNodeKey, string[]>(),
+    evidenceEvents: 0,
+    evidenceDocuments: 0,
+    round1Count: 0,
+    round2Count: 0,
+    round2Targets: [] as string[],
+    finalDecision: ''
+  }
+
+  runStream.timelineEvents.forEach((event) => {
+    const flow = eventFlowNode(event)
+    if (event.event === 'agent_started') {
+      pushUniqueMapValue(state.activeAgents, flow, agentDisplayName(String(streamEventField(event, 'agent_id') || 'agent')))
+    }
+    if (event.event === 'agent_completed') {
+      pushUniqueMapValue(state.completedAgents, flow, agentDisplayName(String(streamEventField(event, 'agent_id') || 'agent')))
+    }
+    if (event.event === 'tool_observation' && Array.isArray(streamEventField(event, 'tools'))) {
+      const counts = extractToolEvidenceCounts(streamEventField(event, 'tools') as unknown[])
+      state.evidenceEvents += counts.events
+      state.evidenceDocuments += counts.documents
+    }
+    if (event.event === 'mediator_decision') {
+      const round1 = Number(streamEventField(event, 'round1_count'))
+      const round2 = Number(streamEventField(event, 'round2_count'))
+      if (Number.isFinite(round1)) state.round1Count = Math.max(state.round1Count, round1)
+      if (Number.isFinite(round2)) state.round2Count = Math.max(state.round2Count, round2)
+      const targets = streamEventField(event, 'targets_to_recall')
+      if (Array.isArray(targets)) {
+        state.round2Targets = targets.map((target) => agentDisplayName(String(target)))
+      }
+    }
+    if (event.event === 'run_completed') {
+      state.finalDecision = String(streamEventField(event, 'decision') || '')
+    }
+    if (event.event === 'final_decision_draft') {
+      state.finalDecision = String(streamEventField(event, 'decision') || streamEventField(event, 'branch') || state.finalDecision || '')
+    }
+  })
+
+  if (state.round1Count === 0) {
+    state.round1Count = ['risk', 'macro', 'cost', 'news']
+      .reduce((sum, node) => sum + (state.completedAgents.get(node as FlowNodeKey)?.length ?? 0), 0)
+  }
+
+  return state
+})
 const selectedStrategicModeConfig = computed(() =>
   STRATEGIC_MODES.find((mode) => mode.value === selectedStrategicMode.value) ?? STRATEGIC_MODES[1]
 )
@@ -402,6 +589,431 @@ const holdingRows = computed(() => {
   })
 })
 
+const portfolioHoldingCards = computed<PortfolioHoldingCard[]>(() => {
+  if (!holdings.value.length || totalValue.value <= 0) {
+    return DEMO_PORTFOLIO.map((asset) => ({
+      key: asset.key,
+      ticker: asset.ticker,
+      name: asset.name,
+      weightPct: asset.weight,
+      targetPct: asset.target,
+      valueLabel: formatKrw(asset.value),
+      profitLabel: `${asset.profitRate > 0 ? '+' : ''}${asset.profitRate.toFixed(1)}%`,
+      tone: asset.tone,
+      assetClass: asset.ticker === 'USD' ? 'CASH' : inferAssetClass(asset.ticker, asset.name)
+    }))
+  }
+
+  const liveRows = holdings.value
+    .map((holding) => {
+      const valuation = toNumber(holding.valuationAmount) ?? 0
+      const weightPct = totalValue.value > 0 ? (valuation / totalValue.value) * 100 : 0
+      const assetClass = inferAssetClass(holding.symbol, holding.name)
+      return { holding, valuation, weightPct, assetClass }
+    })
+    .filter((row) => row.valuation > 0 || row.weightPct > 0)
+    .sort((a, b) => b.valuation - a.valuation)
+
+  const classTotals = liveRows.reduce<Record<AssetClassKey, number>>((acc, row) => {
+    acc[row.assetClass] += row.weightPct
+    return acc
+  }, { EQUITY: 0, BOND: 0, ALT: 0, CASH: 0 })
+
+  const cards = liveRows.slice(0, cashValue.value > 0 ? 7 : 8).map((row) => {
+    const { holding, valuation, weightPct, assetClass } = row
+    const profitRate = toNumber(holding.profitLossRate) ?? 0
+    const classTarget = selectedStrategicModeConfig.value.assetClassTarget[assetClass] ?? weightPct
+    const targetPct = classTotals[assetClass] > 0
+      ? (weightPct / classTotals[assetClass]) * classTarget
+      : weightPct
+    return {
+      key: holding.symbol,
+      ticker: holding.symbol,
+      name: holding.name || holding.symbol,
+      weightPct,
+      targetPct: Math.max(0, targetPct),
+      valueLabel: formatKrw(valuation),
+      profitLabel: formatSignedPercent(profitRate),
+      tone: (toNumber(holding.profitLossAmount) ?? 0) >= 0 ? 'positive' as Tone : 'danger' as Tone,
+      assetClass
+    }
+  })
+
+  if (cashValue.value > 0) {
+    const cashPct = totalValue.value > 0 ? (cashValue.value / totalValue.value) * 100 : 0
+    cards.push({
+      key: 'cash',
+      ticker: 'CASH',
+      name: '현금성 자산',
+      weightPct: cashPct,
+      targetPct: selectedStrategicModeConfig.value.minCashPct,
+      valueLabel: formatKrw(cashValue.value),
+      profitLabel: '0.00%',
+      tone: 'neutral',
+      assetClass: 'CASH'
+    })
+  }
+
+  return cards
+})
+
+const activeDecisionSubject = computed(() =>
+  selectedDashboardSubject.value || portfolioHoldingCards.value[0]?.ticker || 'PORTFOLIO'
+)
+
+const summarySubjectRows = computed(() =>
+  portfolioHoldingCards.value.map((asset, index) => {
+    const drift = asset.weightPct - asset.targetPct
+    const branch = Math.abs(drift) >= 5
+      ? 'WEAK_CONSENSUS'
+      : asset.tone === 'danger'
+        ? 'WATCH'
+        : 'STRONG_HOLD'
+    const decrease = Math.max(1, Math.min(7, Math.round(Math.max(0, drift) / 2) + (asset.tone === 'danger' ? 2 : 1)))
+    const increase = Math.max(1, Math.min(6, Math.round(Math.max(0, -drift) / 3) + (asset.tone === 'positive' ? 1 : 0)))
+    const hold = Math.max(1, 13 - decrease - increase)
+    return {
+      key: asset.key,
+      ticker: asset.ticker,
+      name: asset.name,
+      branch,
+      isMain: asset.ticker === activeDecisionSubject.value || (!selectedDashboardSubject.value && index === 0),
+      score: Math.max(-0.75, Math.min(0.75, -drift / 20)),
+      votes: { increase, hold, decrease }
+    }
+  })
+)
+
+const dashboardSummary = computed(() => {
+  if (runStream.isStreaming) {
+    return {
+      action: 'RUNNING',
+      text: `${activeDecisionSubject.value} 포함 포트폴리오를 에이전트 위원회가 분석 중입니다.`,
+      className: 'is-hold'
+    }
+  }
+  if (runStream.phase === 'completed') {
+    const decision = latestFinalDecision.value
+    return {
+      action: decision?.decision || 'DONE',
+      text: decision?.summary || '최종 판단이 완료되었습니다. 실행 가능한 거래가 있을 때만 체결 단계로 넘깁니다.',
+      className: 'is-hold'
+    }
+  }
+  if (runStream.phase === 'failed' || runStream.phase === 'interrupted') {
+    return {
+      action: 'REVIEW',
+      text: '마지막 실행은 검토가 필요합니다. 에이전트 탭에서 중단 지점을 확인할 수 있습니다.',
+      className: 'is-sell'
+    }
+  }
+  return {
+    action: 'HOLD',
+    text: `${activeDecisionSubject.value} 기준 강한 즉시 조정 신호는 없으며, drift가 남을 때만 확인 후 조정합니다.`,
+    className: 'is-hold'
+  }
+})
+
+const consensusRows = computed(() => {
+  const subject = summarySubjectRows.value.find((row) => row.ticker === activeDecisionSubject.value)
+  if (!subject) return DEMO_DECISION_VOTES
+  return [
+    { direction: 'INCREASE' as VoteDirection, count: subject.votes.increase, label: 'INCREASE', tone: 'is-increase' },
+    { direction: 'HOLD' as VoteDirection, count: subject.votes.hold, label: 'HOLD', tone: 'is-hold' },
+    { direction: 'DECREASE' as VoteDirection, count: subject.votes.decrease, label: 'DECREASE', tone: 'is-decrease' }
+  ]
+})
+
+const consensusTotal = computed(() => consensusRows.value.reduce((sum, row) => sum + row.count, 0) || 1)
+const consensusBranchLabel = computed(() =>
+  summarySubjectRows.value.find((row) => row.ticker === activeDecisionSubject.value)?.branch || 'WEAK_CONSENSUS'
+)
+
+const agentOpinionRows = computed(() =>
+  DEMO_AGENT_OPINIONS.map((opinion) => ({
+    ...opinion,
+    confidenceLabel: `${Math.round(opinion.confidence * 100)}%`,
+    verdictClass: opinion.direction === 'INCREASE'
+      ? 'is-increase'
+      : opinion.direction === 'DECREASE'
+        ? 'is-decrease'
+        : 'is-hold'
+  }))
+)
+
+const dashboardComplianceChecks = computed(() => [
+  { rule: 'UNIVERSE', passed: true, detail: `${portfolioHoldingCards.value.length}개 보유 종목 확인` },
+  { rule: 'SINGLE_ASSET_MAX', passed: Math.max(...portfolioHoldingCards.value.map((asset) => asset.weightPct), 0) <= selectedStrategicModeConfig.value.singleTickerLimitPct + 5, detail: `단일 종목 한도 ${selectedStrategicModeConfig.value.singleTickerLimitPct}% 기준 검토` },
+  { rule: 'CASH_FLOOR', passed: true, detail: `최소 현금 ${selectedStrategicModeConfig.value.minCashPct}% 정책 적용` },
+  { rule: 'EXECUTION_GATE', passed: true, detail: 'T+2 residual drift 확인 후 체결' }
+])
+
+const trendBars = computed(() => {
+  const snapshotValues = snapshots.value
+    .map((snapshot) => ({
+      createdAt: new Date(snapshot.createdAt).getTime(),
+      value: toNumber(snapshot.totalValuationAmount) ?? toNumber(snapshot.netAssetAmount) ?? 0
+    }))
+    .filter((row) => row.value > 0 && Number.isFinite(row.createdAt))
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(-20)
+    .map((row) => row.value)
+
+  const liveValue = totalValue.value > 0 ? totalValue.value : 0
+  const values = [...snapshotValues]
+  if (balance.value && liveValue > 0 && Math.abs((values.at(-1) ?? 0) - liveValue) > 1) {
+    values.push(liveValue)
+  }
+
+  if (values.length < 2) {
+    const base = displayTotalValue.value || DEMO_TOTAL_VALUE
+    if (portfolioDataSource.value === 'DEMO') {
+      values.splice(0, values.length, ...Array.from({ length: 18 }, (_, index) => {
+        const wave = Math.sin(index * 0.75) * 0.035 + Math.cos(index * 0.33) * 0.018
+        const growth = index * 0.006
+        return base * (0.88 + growth + wave)
+      }))
+    } else {
+      values.splice(0, values.length, ...Array.from({ length: 8 }, () => base))
+    }
+  }
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  return values.map((value, index) => {
+    const ratio = (value - min) / span
+    return {
+      key: `trend-${index}`,
+      value,
+      height: `${Math.max(18, Math.min(96, 18 + ratio * 78))}%`
+    }
+  })
+})
+
+const terminalAssets = computed(() => {
+  const colors = ['#3b82f6', '#8b5cf6', '#2dd4bf', '#f59e0b', '#94a3b8', '#22c55e', '#ef4444', '#f97316']
+  return portfolioHoldingCards.value.map((asset, index) => {
+    const profitClass = asset.tone === 'positive' ? 'pos' : asset.tone === 'danger' ? 'neg' : 'flat'
+    return {
+      ...asset,
+      color: colors[index % colors.length],
+      profitClass,
+      allocationLabel: `${asset.weightPct.toFixed(1)}% / ${asset.targetPct.toFixed(1)}%`
+    }
+  })
+})
+
+const terminalConsensus = computed(() => {
+  const candidates = terminalAssets.value.filter((asset) => asset.assetClass !== 'CASH')
+  const liveVotes = latestAgentCompletedEvents.value.map((event) => ({
+    event,
+    direction: voteDirectionFromAgent(event),
+    confidence: typeof event.data.confidence === 'number' ? event.data.confidence : null
+  }))
+
+  if (liveVotes.length) {
+    const nInc = liveVotes.filter((vote) => vote.direction === 'INCREASE').length
+    const nHold = liveVotes.filter((vote) => vote.direction === 'HOLD').length
+    const nDec = liveVotes.filter((vote) => vote.direction === 'DECREASE').length
+    const total = Math.max(1, nInc + nHold + nDec)
+    const top = consensusFocusAsset(liveVotes.map((vote) => vote.event)) || mostDriftedAsset(candidates)
+    const drift = top ? top.weightPct - top.targetPct : 0
+    const action = nInc > nDec ? 'ADD' : nDec > nInc ? 'TRIM' : 'HOLD'
+    const confidence = liveVotes
+      .map((vote) => vote.confidence)
+      .filter((value): value is number => typeof value === 'number')
+    const avgConfidence = confidence.length
+      ? Math.round((confidence.reduce((sum, value) => sum + value, 0) / confidence.length) * 100)
+      : null
+    return {
+      nInc,
+      nHold,
+      nDec,
+      total,
+      top,
+      drift,
+      magnitude: Math.abs(drift).toFixed(1),
+      action,
+      verb: action === 'TRIM' ? 'Trim' : action === 'ADD' ? 'Add' : 'Hold',
+      directionClass: action === 'ADD' ? 'up' : '',
+      conflict: nInc > 0 && nDec > 0,
+      badge: avgConfidence === null ? 'LIVE' : `LIVE ${avgConfidence}%`,
+      badgeClass: nInc > 0 && nDec > 0 ? 'td-badge-conflict' : 'td-badge-consensus',
+      source: 'agent'
+    }
+  }
+
+  let inc = 0
+  let hold = 0
+  let dec = 0
+  candidates.forEach((asset) => {
+    const drift = asset.weightPct - asset.targetPct
+    if (drift <= -2) inc += 1
+    else if (drift >= 2) dec += 1
+    else hold += 1
+  })
+
+  const rawTotal = Math.max(1, inc + hold + dec)
+  const normalizedTotal = 13
+  let nInc = Math.round((inc / rawTotal) * normalizedTotal)
+  let nDec = Math.round((dec / rawTotal) * normalizedTotal)
+  let nHold = normalizedTotal - nInc - nDec
+  if (nHold < 0) {
+    nHold = 0
+    nDec = normalizedTotal - nInc
+  }
+
+  const top = mostDriftedAsset(candidates)
+  const drift = top ? top.weightPct - top.targetPct : 0
+  const magnitude = Math.abs(drift).toFixed(1)
+  const action = drift >= 2 ? 'TRIM' : drift <= -2 ? 'ADD' : 'HOLD'
+  const verb = action === 'TRIM' ? 'Trim' : action === 'ADD' ? 'Add' : 'Hold'
+  const directionClass = action === 'ADD' ? 'up' : ''
+  const conflict = inc > 0 && dec > 0
+  const total = nInc + nHold + nDec
+
+  return {
+    nInc,
+    nHold,
+    nDec,
+    total,
+    top,
+    drift,
+    magnitude,
+    action,
+    verb,
+    directionClass,
+    conflict,
+    badge: conflict ? 'CONFLICT' : action === 'HOLD' ? 'CONSENSUS' : 'CONSENSUS',
+    badgeClass: conflict ? 'td-badge-conflict' : 'td-badge-consensus',
+    source: 'policy'
+  }
+})
+
+const terminalConsensusDescription = computed(() => {
+  const c = terminalConsensus.value
+  if (!c.top || c.action === 'HOLD') {
+    const source = c.source === 'agent' ? '실시간 에이전트 의견 기준' : '정책 밴드 기준'
+    return `${c.total}개 의견을 집계했습니다. ${source}으로 즉각적인 리밸런싱은 불필요합니다.`
+  }
+  const reason = c.action === 'TRIM'
+    ? `${c.top.ticker} 비중이 목표 대비 +${c.magnitude}%p 초과편입 상태입니다.`
+    : `${c.top.ticker} 비중이 목표 대비 ${c.magnitude}%p 과소편입 상태입니다.`
+  const source = c.source === 'agent' ? '실시간 에이전트 의견과 포트폴리오 drift를 함께 반영했습니다.' : '목표 배분 정책에서 계산했습니다.'
+  return `${c.total}개 의견을 집계했습니다. ${reason} ${c.conflict ? '도메인 간 신호 분산이 높아 사용자 확인이 권장됩니다.' : source}`
+})
+
+const terminalOpinionRows = computed(() => {
+  if (latestAgentCompletedEvents.value.length) {
+    return [...latestAgentCompletedEvents.value].reverse().slice(0, 4).map((event) => {
+      const direction = voteDirectionFromAgent(event)
+      const tone = direction === 'INCREASE' ? 'inc' : direction === 'DECREASE' ? 'dec' : 'hold'
+      const confidence = typeof event.data.confidence === 'number'
+        ? ` ${Math.round(event.data.confidence * 100)}%`
+        : ''
+      const detail = [
+        event.data.reasoning,
+        event.data.opinion,
+        event.data.verdict,
+        event.data.limits_acknowledged
+      ].find((value) => typeof value === 'string' && value.trim())
+      return {
+        key: `${event.data.agent_id}-${event.data.turn_number ?? 0}`,
+        domain: `${agentDisplayName(event.data.agent_id)} DOMAIN`.toUpperCase(),
+        verdict: `${direction === 'INCREASE' ? 'INCREASE' : direction === 'DECREASE' ? 'DECREASE' : 'HOLD'}${confidence}`,
+        tone,
+        text: detail
+          ? simplifyDecisionReason(String(detail))
+          : `${agentDisplayName(event.data.agent_id)}가 현재 포트폴리오를 검토했습니다.`
+      }
+    })
+  }
+
+  const top = terminalConsensus.value.top
+  const riskHigh = riskScore.value >= 7
+  const maxWeight = Math.max(...terminalAssets.value.map((asset) => asset.weightPct), 0)
+  const driftText = top
+    ? `${top.ticker} drift ${formatSignedPoint(top.weightPct - top.targetPct)}p`
+    : '목표 밴드 내 유지'
+  return [
+    {
+      key: 'risk',
+      domain: 'RISK DOMAIN',
+      verdict: riskHigh ? 'DECREASE 70%' : 'HOLD',
+      tone: riskHigh ? 'dec' : 'hold',
+      text: `Portfolio risk score at ${Math.round(riskScore.value * 10)}. Max asset weight ${maxWeight.toFixed(1)}%. ${riskHigh ? '상한 근접 - 고베타 익스포저 축소 권고.' : '현재 정책 밴드 내에서 유지 가능합니다.'}`
+    },
+    {
+      key: 'allocation',
+      domain: 'ALLOCATION DOMAIN',
+      verdict: terminalConsensus.value.action === 'ADD'
+        ? 'INCREASE'
+        : terminalConsensus.value.action === 'TRIM'
+          ? 'DECREASE'
+          : 'HOLD',
+      tone: terminalConsensus.value.action === 'ADD'
+        ? 'inc'
+        : terminalConsensus.value.action === 'TRIM'
+          ? 'dec'
+          : 'hold',
+      text: `${portfolioDataSource.value} 포트폴리오 기준 ${driftText}.`
+    },
+    {
+      key: 'execution',
+      domain: 'EXECUTION CORE',
+      verdict: status.value?.tradingEnabled ? 'READY' : 'DRY RUN',
+      tone: status.value?.tradingEnabled ? 'inc' : 'hold',
+      text: audits.value.length
+        ? `최근 주문 감사 ${audits.value.length}건을 반영했습니다. 마지막 상태: ${audits.value[0]?.status || 'N/A'}.`
+        : '주문 감사 기록이 없어 실행 전 broker gate 확인이 필요합니다.'
+    }
+  ]
+})
+
+const terminalComplianceRows = computed(() => {
+  const maxWeight = Math.max(...terminalAssets.value.map((asset) => asset.weightPct), 0)
+  const cashWeightPct = terminalAssets.value.find((asset) => asset.assetClass === 'CASH')?.weightPct ?? 0
+  const riskIndex = Math.round(riskScore.value * 12)
+  const symbolLimitOk = status.value?.symbolAllowListEnabled
+    ? terminalAssets.value.length <= status.value.allowedSymbolsCount
+    : true
+  const brokerReady = !!status.value?.registered && !!status.value.enabled && !!status.value.accountConfigured
+  return [
+    { key: 'universe', label: 'Universe Bounds', ok: symbolLimitOk, value: status.value?.symbolAllowListEnabled ? `${terminalAssets.value.length}/${status.value.allowedSymbolsCount}` : 'OK' },
+    { key: 'concentration', label: 'Asset Concentration', ok: maxWeight <= selectedStrategicModeConfig.value.singleTickerLimitPct + 5, value: `${selectedStrategicModeConfig.value.singleTickerLimitPct}% LIMIT` },
+    { key: 'cash', label: 'Cash Floor', ok: cashWeightPct >= selectedStrategicModeConfig.value.minCashPct, value: `> ${selectedStrategicModeConfig.value.minCashPct}%` },
+    { key: 'risk', label: 'Risk Index', ok: riskIndex <= 90, value: `${riskIndex}/90` },
+    { key: 'broker', label: 'Broker Link', ok: brokerReady || portfolioDataSource.value === 'SNAPSHOT', value: portfolioDataSource.value }
+  ]
+})
+
+const terminalSafetyPass = computed(() => terminalComplianceRows.value.every((row) => row.ok))
+
+const terminalTrendSvg = computed(() => {
+  const values = trendBars.value.map((bar) => bar.value)
+  const width = 1000
+  const height = 180
+  const pad = 6
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  const x = (index: number) => pad + (index / Math.max(1, values.length - 1)) * (width - pad * 2)
+  const y = (value: number) => (height - pad) - ((value - min) / span) * (height - pad * 2)
+  const linePath = values.map((value, index) => `${index === 0 ? 'M' : 'L'}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')
+  const areaPath = `${linePath} L${x(values.length - 1).toFixed(1)},${height} L${x(0).toFixed(1)},${height} Z`
+  const first = values[0] || displayTotalValue.value
+  const last = values[values.length - 1] || displayTotalValue.value
+  const delta = first > 0 ? ((last - first) / first) * 100 : 0
+  return {
+    linePath,
+    areaPath,
+    endX: x(values.length - 1),
+    endY: y(last),
+    deltaLabel: `DELTA: ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}%`
+  }
+})
+
 const protocolRows = computed(() => [
   { key: 'ACCOUNT', value: status.value?.maskedAccountNumber || '50082394-01', status: 'online' },
   { key: 'ORDER_CHANNEL', value: status.value?.tradingEnabled ? 'READY' : 'READY', status: 'online' },
@@ -478,7 +1090,7 @@ onBeforeUnmount(() => {
 
 async function loadInitial() {
   await loadKisStatus()
-  const tasks: Promise<void>[] = [loadSnapshots()]
+  const tasks: Promise<void>[] = [loadSnapshots(), loadLatestSnapshotDetail()]
   if (status.value?.registered && status.value.accountConfigured) {
     tasks.push(loadBalance(false), loadAudits())
   }
@@ -491,7 +1103,7 @@ async function refreshAll() {
   pageError.value = ''
   try {
     await loadKisStatus()
-    const tasks: Promise<void>[] = [loadSnapshots()]
+    const tasks: Promise<void>[] = [loadSnapshots(), loadLatestSnapshotDetail()]
     if (status.value?.registered && status.value.accountConfigured) {
       tasks.push(loadBalance(true), loadAudits())
       pageNotice.value = '운영 데이터가 갱신되었습니다.'
@@ -541,6 +1153,15 @@ async function loadSnapshots() {
     snapshots.value = []
   } finally {
     loading.snapshots = false
+  }
+}
+
+async function loadLatestSnapshotDetail() {
+  try {
+    const res = await brokerApi.latestPortfolioSnapshot()
+    snapshotBalance.value = parseSnapshotBalance(res.data.snapshotJson)
+  } catch {
+    snapshotBalance.value = null
   }
 }
 
@@ -617,7 +1238,10 @@ async function startAgentRun() {
   pageNotice.value = ''
   pageError.value = ''
   if (!hasExecutablePortfolio.value) {
-    pageNotice.value = 'KIS 잔고를 먼저 동기화해야 리밸런싱 판단을 실행할 수 있습니다.'
+    await loadLatestSnapshotDetail()
+  }
+  if (!hasExecutablePortfolio.value) {
+    pageNotice.value = 'KIS 잔고를 동기화하거나 저장된 포트폴리오 snapshot이 있어야 리밸런싱 판단을 실행할 수 있습니다.'
     setActiveTab('mypage')
     return
   }
@@ -649,7 +1273,7 @@ async function startAgentRun() {
       }
     }
     await runStream.start(body)
-    await Promise.allSettled([loadBalance(true), loadSnapshots(), loadAudits()])
+    await Promise.allSettled([loadBalance(true), loadSnapshots(), loadLatestSnapshotDetail(), loadAudits()])
   } catch (err) {
     pageError.value = errorMessage(err)
   }
@@ -657,8 +1281,10 @@ async function startAgentRun() {
 
 function currentPortfolioPayload(): Record<string, unknown> {
   return {
-    source: 'kis_live_balance',
+    source: balance.value ? 'kis_live_balance' : snapshotBalance.value ? 'portfolio_snapshot' : 'dashboard_fallback',
     as_of: new Date().toISOString(),
+    snapshot_id: balance.value?.snapshotId || snapshotBalance.value?.snapshotId || latestSnapshot.value?.id || null,
+    data_source: portfolioDataSource.value,
     summary: visibleSummary.value,
     holdings: holdings.value.map((holding) => {
       const valuation = toNumber(holding.valuationAmount) ?? 0
@@ -724,8 +1350,29 @@ function setActiveTab(tab: DashboardTab) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function setTerminalAssetNav(nav: 'main' | 'equities' | 'fixed' | 'crypto' | 'calendar') {
+  terminalAssetNav.value = nav
+  terminalCenterView.value = nav === 'calendar' ? 'calendar' : 'overview'
+}
+
+function openDraftOrders() {
+  pageError.value = ''
+  pageNotice.value = 'Draft Orders는 다음 체결 후보를 생성하기 전 검토 대기 상태입니다.'
+}
+
 function setAgentSubtab(tab: AgentSubtab) {
   activeAgentSubtab.value = tab
+}
+
+function selectDashboardSubject(subject: string, targetSubtab: AgentSubtab = 'history') {
+  selectedDashboardSubject.value = subject
+  activeTab.value = 'agent'
+  activeAgentSubtab.value = targetSubtab
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function clearDashboardSubject() {
+  selectedDashboardSubject.value = null
 }
 
 function setLanguage(language: 'KO' | 'EN') {
@@ -761,6 +1408,8 @@ function syncModeFromRiskScore() {
 function toggleTheme() {
   isDarkTheme.value = !isDarkTheme.value
   window.localStorage.setItem('libra-dashboard-theme', isDarkTheme.value ? 'dark' : 'light')
+  pageNotice.value = ''
+  pageError.value = ''
 }
 
 function applyAgentSettings() {
@@ -815,6 +1464,13 @@ function streamEventField(event: { data?: unknown }, key: string): unknown {
   return (data as Record<string, unknown>)[key]
 }
 
+function pushUniqueMapValue(map: Map<FlowNodeKey, string[]>, key: FlowNodeKey, value: string) {
+  const list = map.get(key) ?? []
+  if (!list.includes(value)) {
+    map.set(key, [...list, value])
+  }
+}
+
 function eventActorValue(event: { event: string; data?: unknown }): unknown {
   return (
     streamEventField(event, 'agent_id') ||
@@ -839,23 +1495,46 @@ function eventFlowNode(event: { event: string; data?: unknown }): FlowNodeKey {
 }
 
 function flowNodeLabel(node: FlowNodeKey | ''): string {
-  switch (node) {
-    case 'risk':
-      return 'RISK NODE'
-    case 'macro':
-      return 'PROFIT NODE'
-    case 'cost':
-      return 'COST NODE'
-    case 'news':
-      return 'EVIDENCE NODE'
-    case 'mediator':
-      return 'MEDIATOR NODE'
-    case 'judge':
-      return 'FINAL JUDGE NODE'
-    case 'core':
-    default:
-      return 'CORE NODE'
+  return node ? FLOW_NODE_META[node].title : FLOW_NODE_META.core.title
+}
+
+function flowNodeTitle(node: FlowNodeKey): string {
+  return FLOW_NODE_META[node].title
+}
+
+function flowNodeRuntimeText(node: FlowNodeKey): string {
+  const status = flowNodeStatus(node)
+  if (status === 'status-active') return FLOW_NODE_META[node].active
+  if (status === 'status-complete') return FLOW_NODE_META[node].complete
+  return FLOW_NODE_META[node].idle
+}
+
+function flowNodeAgentChips(node: FlowNodeKey): string[] {
+  const completed = councilFlowState.value.completedAgents.get(node) ?? []
+  const active = councilFlowState.value.activeAgents.get(node) ?? []
+  const observed = [...active, ...completed]
+  if (observed.length) return observed.slice(0, 3)
+  return FLOW_NODE_META[node].agents.slice(0, 3)
+}
+
+function flowNodeCountText(node: FlowNodeKey): string {
+  const completed = councilFlowState.value.completedAgents.get(node)?.length ?? 0
+  const active = councilFlowState.value.activeAgents.get(node)?.length ?? 0
+  if (completed > 0) return `${completed} done`
+  if (active > 0) return `${active} active`
+  return ''
+}
+
+function flowStatusSummary(): string {
+  const state = councilFlowState.value
+  const parts: string[] = []
+  if (state.round1Count > 0) parts.push(`ROUND 1 ${state.round1Count}`)
+  if (state.round2Count > 0) parts.push(`ROUND 2 ${state.round2Count}`)
+  if (state.evidenceEvents || state.evidenceDocuments) {
+    parts.push(`EVIDENCE ${state.evidenceEvents + state.evidenceDocuments}`)
   }
+  if (state.finalDecision) parts.push(state.finalDecision)
+  return parts.join(' · ') || 'LIVE TRACE'
 }
 
 function flowNodeStatus(node: FlowNodeKey): '' | 'status-active' | 'status-complete' {
@@ -907,11 +1586,11 @@ function normalizeFlowNode(value: unknown): FlowNodeKey | '' {
   const text = String(value || '').toLowerCase()
   if (text.includes('judge') || text.includes('final') || text.includes('human_review') || text.includes('interrupt')) return 'judge'
   if (text.includes('mediator') || text.includes('consensus') || text.includes('conflict')) return 'mediator'
-  if (text.includes('risk') || text.includes('liquidity') || text.includes('technical') || text.includes('volatility') || text.includes('drawdown')) return 'risk'
-  if (text.includes('macro') || text.includes('profit') || text.includes('fundamental') || text.includes('valuation') || text.includes('performance') || text.includes('return')) return 'macro'
-  if (text.includes('cost') || text.includes('tax') || text.includes('execution') || text.includes('turnover') || text.includes('fee')) return 'cost'
+  if (text.includes('risk') || text.includes('liquidity') || text.includes('technical') || text.includes('volatility') || text.includes('drawdown') || text.includes('compliance')) return 'risk'
+  if (text.includes('macro') || text.includes('profit') || text.includes('fundamental') || text.includes('valuation') || text.includes('performance') || text.includes('return') || text.includes('esg')) return 'macro'
+  if (text.includes('cost') || text.includes('tax') || text.includes('execution') || text.includes('turnover') || text.includes('fee') || text.includes('trade')) return 'cost'
   if (text.includes('news') || text.includes('report') || text.includes('sentiment') || text.includes('disclosure') || text.includes('article') || text.includes('evidence')) return 'news'
-  if (text.includes('core') || text.includes('committee') || text.includes('compliance') || text.includes('round1') || text.includes('round_1') || text.includes('run_') || text.includes('node_')) return 'core'
+  if (text.includes('core') || text.includes('committee') || text.includes('round1') || text.includes('round_1') || text.includes('run_') || text.includes('node_')) return 'core'
   return ''
 }
 
@@ -933,6 +1612,88 @@ function transcriptAvatar(event: { event: string; data?: Record<string, unknown>
   if (node === 'mediator') return 'green'
   if (node === 'judge') return 'orange'
   return 'dark'
+}
+
+function inferAssetClass(ticker: string, name = ''): AssetClassKey {
+  const text = `${ticker} ${name}`.toUpperCase()
+  if (['USD', 'CASH', 'KRW'].some((token) => text.includes(token)) || /현금|예수금/.test(name)) return 'CASH'
+  if (/(TLT|IEF|SHY|BND|AGG|LQD|HYG|BOND|채권|국채|회사채)/i.test(text)) return 'BOND'
+  if (/(GLD|IAU|SLV|PDBC|DBC|BTC|ETH|금|원자재|CRYPTO)/i.test(text)) return 'ALT'
+  return 'EQUITY'
+}
+
+function voteDirectionFromAgent(event: AgentCompletedRunEvent): VoteDirection {
+  const numeric = event.data.direction
+  if (typeof numeric === 'number') {
+    if (numeric > 0.15) return 'INCREASE'
+    if (numeric < -0.15) return 'DECREASE'
+    return 'HOLD'
+  }
+
+  const text = [
+    event.data.opinion,
+    event.data.verdict,
+    event.data.reasoning
+  ].filter(Boolean).join(' ').toUpperCase()
+  if (/(INCREASE|BUY|ADD|OVERWEIGHT|EXPAND|비중 확대|매수|추가)/.test(text)) return 'INCREASE'
+  if (/(DECREASE|SELL|TRIM|REDUCE|UNDERWEIGHT|비중 축소|매도|감축)/.test(text)) return 'DECREASE'
+  return 'HOLD'
+}
+
+function mostDriftedAsset<T extends { weightPct: number; targetPct: number }>(assets: T[]): T | undefined {
+  return [...assets].sort((a, b) =>
+    Math.abs(b.weightPct - b.targetPct) - Math.abs(a.weightPct - a.targetPct)
+  )[0]
+}
+
+function consensusFocusAsset(events: AgentCompletedRunEvent[]) {
+  const scores = new Map<string, number>()
+  events.forEach((event) => {
+    event.data.focus_tickers?.forEach((ticker) => {
+      const key = ticker.toUpperCase()
+      scores.set(key, (scores.get(key) ?? 0) + 1)
+    })
+  })
+
+  const [ticker] = [...scores.entries()].sort((a, b) => b[1] - a[1])[0] ?? []
+  if (!ticker) return undefined
+  return terminalAssets.value.find((asset) => asset.ticker.toUpperCase() === ticker)
+}
+
+function formatSignedPoint(value: number): string {
+  return `${value >= 0 ? '+' : ''}${value.toFixed(1)}`
+}
+
+function parseSnapshotBalance(value: string): KisBalance | null {
+  const parsed = parseJsonObject(value)
+  if (!parsed) return null
+  const source = normalizeSnapshotRecord(parsed)
+  if (!source) return null
+  const summary = source.summary
+  const holdings = Array.isArray(source.holdings) ? source.holdings : []
+  if (!summary || typeof summary !== 'object') return null
+  return {
+    snapshotId: typeof source.snapshotId === 'string' ? source.snapshotId : latestSnapshot.value?.id ?? null,
+    environment: typeof source.environment === 'string' ? source.environment : latestSnapshot.value?.environment ?? 'SNAPSHOT',
+    holdings: holdings as KisBalance['holdings'],
+    summary: summary as KisBalance['summary'],
+    rawSummary: typeof source.rawSummary === 'object' && source.rawSummary !== null ? source.rawSummary as Record<string, unknown> : {},
+    hasNextPage: false,
+    nextContextFk: '',
+    nextContextNk: ''
+  }
+}
+
+function normalizeSnapshotRecord(record: Record<string, unknown>): Record<string, unknown> | null {
+  if (record.summary && Array.isArray(record.holdings)) return record
+  const candidates = [record.balance, record.kisBalance, record.data, record.snapshot]
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      const nested = candidate as Record<string, unknown>
+      if (nested.summary && Array.isArray(nested.holdings)) return nested
+    }
+  }
+  return null
 }
 
 function toNumber(value: DecimalValue | undefined): number | null {
@@ -1066,6 +1827,10 @@ function eventDetail(event: { event: string; data?: Record<string, unknown> }): 
   const direct = userFacingEventDetail(event)
   if (direct) return direct
 
+  if (typeof data.error === 'string' && data.error.trim()) {
+    return userFacingError(data.error)
+  }
+
   if (Array.isArray(data.tools)) {
     return summarizeToolObservation(data.tools)
   }
@@ -1111,7 +1876,7 @@ function summarizeOutput(output: unknown): string {
   }
 }
 
-function summarizeToolObservation(tools: unknown[]): string {
+function extractToolEvidenceCounts(tools: unknown[]): { events: number; documents: number; refreshed: boolean; phases: string[] } {
   let eventCount = 0
   let documentCount = 0
   let refreshed = false
@@ -1122,27 +1887,29 @@ function summarizeToolObservation(tools: unknown[]): string {
     const record = tool as Record<string, unknown>
     const toolName = String(record.tool_name || '')
     const summary = String(record.summary || record.purpose || '')
-    if (toolName.includes('load_events')) {
-      const matched = summary.match(/(\d+)\s*건/)
-      if (matched) eventCount += Number(matched[1])
-    }
-    if (toolName.includes('load_documents')) {
-      const matched = summary.match(/(\d+)\s*건/)
-      if (matched) documentCount += Number(matched[1])
-    }
+    const matched = summary.match(/(\d+)\s*건/)
+    if (toolName.includes('load_events') && matched) eventCount += Number(matched[1])
+    if (toolName.includes('load_documents') && matched) documentCount += Number(matched[1])
     if (toolName.includes('refresh') || toolName.includes('ingest')) refreshed = true
     if (toolName.includes('disclosure')) phases.add('공시')
     if (toolName.includes('news')) phases.add('뉴스')
     if (toolName.includes('report')) phases.add('리포트')
+    if (toolName.includes('liquidity')) phases.add('유동성')
+    if (toolName.includes('technical')) phases.add('기술지표')
   })
 
+  return { events: eventCount, documents: documentCount, refreshed, phases: Array.from(phases) }
+}
+
+function summarizeToolObservation(tools: unknown[]): string {
+  const { events: eventCount, documents: documentCount, refreshed, phases } = extractToolEvidenceCounts(tools)
   const parts: string[] = []
   if (eventCount > 0) parts.push(`관련 이벤트 ${eventCount}건`)
   if (documentCount > 0) parts.push(`관련 문서 ${documentCount}건`)
   if (parts.length) return `${parts.join(', ')}을 확인했습니다.`
   if (refreshed) return '최신 자료를 다시 수집해 확인했습니다.'
-  if (phases.size) return `${Array.from(phases).join('·')} 자료를 확인했습니다.`
-  return '포트폴리오 관련 근거 자료를 확인했습니다.'
+  if (phases.length) return `${phases.join('·')} 자료를 확인했지만 강한 신호는 없었습니다.`
+  return '포트폴리오 관련 근거를 확인했지만 강한 신호는 없었습니다.'
 }
 
 function compactVisibleEvents(events: Array<{ event: string; data?: Record<string, unknown> }>) {
@@ -1192,6 +1959,15 @@ function userFacingEventDetail(event: { event: string; data?: Record<string, unk
     return summarizeToolObservation(data.tools)
   }
   if (event.event === 'agent_completed') {
+    const direction = typeof data.direction === 'number' ? directionLabel(data.direction) : ''
+    const confidence = typeof data.confidence === 'number' ? `${Math.round(data.confidence * 100)}%` : ''
+    const focusTickers = Array.isArray(data.focus_tickers) && data.focus_tickers.length
+      ? ` 대상: ${data.focus_tickers.slice(0, 3).join(', ')}.`
+      : ''
+    if (direction || confidence) {
+      const bits = [direction && `의견 ${direction}`, confidence && `신뢰도 ${confidence}`].filter(Boolean).join(', ')
+      return `${transcriptSender(event)} 검토 완료: ${bits}.${focusTickers}`
+    }
     const reason = [
       data.reasoning,
       data.limits_acknowledged,
@@ -1200,6 +1976,28 @@ function userFacingEventDetail(event: { event: string; data?: Record<string, unk
     ].find((item) => typeof item === 'string' && item.trim())
     if (!reason) return `${transcriptSender(event)} 검토가 완료되었습니다.`
     return simplifyDecisionReason(String(reason))
+  }
+  if (event.event === 'mediator_decision') {
+    const targets = Array.isArray(data.targets_to_recall)
+      ? data.targets_to_recall.map((target) => agentDisplayName(String(target)))
+      : []
+    const round2Count = typeof data.round2_count === 'number' ? data.round2_count : 0
+    if (targets.length || round2Count > 0) {
+      return `충돌 지점을 확인해 ${targets.join(', ') || `${round2Count}개 에이전트`}를 Round 2에서 다시 검토시켰습니다.`
+    }
+    return '에이전트 의견을 중재했고 추가 재호출 없이 최종 판단으로 넘겼습니다.'
+  }
+  if (event.event === 'consensus_updated') {
+    return '에이전트 의견을 종목별로 다시 합산해 최종 판단 입력으로 정리했습니다.'
+  }
+  if (event.event === 'final_decision_draft') {
+    const decision = data.decision ? String(data.decision) : ''
+    const reasoning = typeof data.reasoning === 'string' ? simplifyDecisionReason(data.reasoning) : ''
+    if (decision && reasoning) return `${decision}: ${reasoning}`
+    if (decision) return `최종 판단 초안: ${decision}`
+  }
+  if (event.event === 'run_failed' || event.event === 'agent_failed' || event.event === 'llm_error') {
+    return userFacingError(String(data.error || '실행 중 오류가 발생했습니다.'))
   }
   if (event.event === 'judge_action') {
     const action = String(data.action || '')
@@ -1252,6 +2050,25 @@ function simplifyDecisionReason(value: string): string {
   return truncateText(text, 320)
 }
 
+function directionLabel(value: number): string {
+  if (value > 0.15) return '비중 확대'
+  if (value < -0.15) return '비중 축소'
+  return '유지'
+}
+
+function userFacingError(value: string): string {
+  if (value.includes('ZoneInfoNotFoundError') || value.includes('No time zone found')) {
+    return '실서비스 데이터 수집 중 시간대 설정 문제가 발생했습니다. 서버 런타임 설정을 확인해야 합니다.'
+  }
+  if (value.includes('Traceback') || value.includes('ModuleNotFoundError') || value.includes('File "')) {
+    const moduleMatch = value.match(/No module named ['"]([^'"]+)['"]/)
+    if (moduleMatch) return `서버 실행 환경에 필요한 패키지(${moduleMatch[1]})가 설치되어 있지 않습니다.`
+    return '서버 실행 중 내부 오류가 발생했습니다. 운영 로그에서 원인을 확인해야 합니다.'
+  }
+  if (value.includes('SSE') || value.includes('500')) return '실시간 분석 연결이 서버 오류로 중단되었습니다.'
+  return truncateText(toUserFacingText(value), 220)
+}
+
 function toUserFacingText(value: string): string {
   return value
     .replaceAll('DIRECT_ANSWER_UNAVAILABLE', '관련 자료 없음')
@@ -1268,6 +2085,8 @@ function toUserFacingText(value: string): string {
     .replaceAll('로컬 캐시', '수집된 자료')
     .replaceAll('캐시', '수집 자료')
     .replaceAll('로컬 이벤트', '관련 이벤트')
+    .replaceAll('local cache', '수집된 자료')
+    .replaceAll('local_knowledge', '자료 조회')
     .replaceAll('정규화 문서', '문서')
     .replaceAll('domain agent', '도메인 에이전트')
     .replaceAll('도메인 에이전트', '전문 에이전트')
@@ -1311,7 +2130,7 @@ function errorMessage(err: unknown): string {
 </script>
 
 <template>
-  <div class="jy-dashboard-host" :class="{ 'dark-theme': isDarkTheme }">
+  <div class="jy-dashboard-host" :class="{ 'dark-theme': isDarkTheme, 'dashboard-tab-active': activeTab === 'dashboard' }">
     <div class="noise-overlay"></div>
     <section id="dashboard-page" class="view-section">
     <nav class="notch-nav" aria-label="primary">
@@ -1333,10 +2152,22 @@ function errorMessage(err: unknown): string {
         <button type="button" class="notch-lang-btn" :class="{ active: activeLanguage === 'KO' }" @click="setLanguage('KO')">KO</button>
         <button type="button" class="notch-lang-btn" :class="{ active: activeLanguage === 'EN' }" @click="setLanguage('EN')">EN</button>
       </div>
+      <div class="notch-actions">
+        <button type="button" class="notch-action-btn" aria-label="알림">
+          <i class="ph ph-bell"></i>
+          <span class="notch-notif-dot">1</span>
+        </button>
+        <button type="button" class="notch-action-btn" title="테마 전환" aria-label="테마 전환" @click="toggleTheme">
+          <i class="ph" :class="isDarkTheme ? 'ph-moon' : 'ph-sun'"></i>
+        </button>
+        <button type="button" class="notch-action-btn" title="로그아웃" aria-label="로그아웃" @click="onLogout">
+          <i class="ph ph-sign-out"></i>
+        </button>
+      </div>
     </nav>
 
-    <div class="zone-dark">
-      <header class="hud-header">
+    <div class="zone-dark" :class="{ 'dashboard-zone-compact': activeTab === 'dashboard' }">
+      <header v-if="activeTab !== 'dashboard'" class="hud-header">
         <div class="header-col">
           <span class="label">시스템 운영</span>
           <div class="hud-title-wrap">
@@ -1365,121 +2196,197 @@ function errorMessage(err: unknown): string {
         {{ pageError || pageNotice }}
       </div>
 
-      <div class="primary-vis-layout" :class="{ hidden: activeTab !== 'dashboard' }">
-        <div>
-          <span class="label">코어 사용량 (AUM 단위 x10M)</span>
-          <div id="hero-value" class="dot-hero">{{ heroValue }}</div>
-          <div class="core-sub-value">
-            <div>
-              <span class="label">총 자산 가치</span>
-                <span id="val-total-assets" class="value">{{ formatKrw(displayTotalValue) }}</span>
-            </div>
-            <div>
-              <span class="label">총 순이익</span>
-              <span id="val-total-profit" class="value" :class="profitClass">
-                {{ formatUnsignedKrw(displayTotalProfit) }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div class="sensor-container">
-          <div style="display: flex; justify-content: space-between;">
-            <span class="label">메모리 매트릭스 (리밸런싱 이력)</span>
-            <span id="mm-allocated-text" class="value">ALLOCATED / 192 DAYS</span>
-          </div>
-          <div id="sensorGrid" class="sensor-grid" aria-label="Memory matrix">
-            <span
-              v-for="node in memoryNodes"
-              :key="node.key"
-              class="sensor-node"
-              :data-level="node.level"
-              :title="node.key"
-            />
-          </div>
-          <div class="mm-hud-summary">
-            <div>
-              <span class="label">총 횟수</span>
-              <span id="mm-total-count" class="value">{{ memorySummary.count }}</span>
-            </div>
-            <div>
-              <span class="label">최대 연속</span>
-              <span id="mm-streak-count" class="value">{{ memorySummary.streak }}</span>
-            </div>
-            <div>
-              <span class="label">최근 리밸런스</span>
-              <span id="mm-last-date" class="value">{{ memorySummary.last }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div id="dashboard-zone-transition" class="zone-transition" :class="{ hidden: activeTab !== 'dashboard' }"></div>
 
     <div class="zone-light">
       <div id="tab-dashboard" class="tab-view-content" :class="{ hidden: activeTab !== 'dashboard' }">
-        <div class="data-matrix">
-          <div class="data-col">
-            <div class="col-header">활성 포트폴리오</div>
-            <ul id="holdings-table-body" class="data-list">
-              <li v-for="row in holdingRows" :key="row.key" class="data-row" :class="row.tone">
-                <span class="holding-badge">
-                  <span class="holding-name">{{ row.name }}</span>
-                  <span class="holding-ticker">{{ row.ticker }}</span>
-                </span>
-                <span class="row-val">{{ row.value }}</span>
-              </li>
-            </ul>
-          </div>
+        <div class="terminal-dash">
+          <aside class="td-rail td-rail-left">
+            <nav class="td-navgroup">
+              <span class="td-navgroup-label">ASSETS</span>
+              <button class="td-navitem" :class="{ active: terminalAssetNav === 'main' }" type="button" @click="setTerminalAssetNav('main')">
+                <i class="ph ph-squares-four"></i><span>Main Portfolio</span>
+              </button>
+              <button class="td-navitem" :class="{ active: terminalAssetNav === 'equities' }" type="button" @click="setTerminalAssetNav('equities')">
+                <i class="ph ph-chart-line-up"></i><span>Equities (US)</span>
+              </button>
+              <button class="td-navitem" :class="{ active: terminalAssetNav === 'fixed' }" type="button" @click="setTerminalAssetNav('fixed')">
+                <i class="ph ph-bank"></i><span>Fixed Income</span>
+              </button>
+              <button class="td-navitem" :class="{ active: terminalAssetNav === 'crypto' }" type="button" @click="setTerminalAssetNav('crypto')">
+                <i class="ph ph-currency-circle-dollar"></i><span>Crypto Assets</span>
+              </button>
+              <button class="td-navitem" :class="{ active: terminalAssetNav === 'calendar' }" type="button" @click="setTerminalAssetNav('calendar')">
+                <i class="ph ph-calendar-blank"></i><span>Calendar</span>
+              </button>
+            </nav>
 
-          <div class="data-col">
-            <div class="col-header">프로토콜 통합</div>
-            <ul class="data-list">
-              <li v-for="row in protocolRows" :key="row.key" class="data-row" :data-status="row.status">
-                <span class="row-key">{{ row.key }}</span>
-                <span class="row-val">{{ row.value }}</span>
-              </li>
-              <li class="data-row quote-row">
-                <input v-model="quoteSymbol" class="inline-input" type="text" aria-label="Quote symbol" />
-                <button type="button" class="inline-btn" :disabled="loading.quote" @click="loadQuote">
-                  {{ loading.quote ? 'FETCH' : 'QUOTE' }}
-                </button>
-              </li>
-              <li v-if="quote" class="data-row positive">
-                <span class="row-key">{{ quote.name || quote.symbol }}</span>
-                <span class="row-val">{{ formatKrw(quote.price) }} / {{ formatSignedPercent(quote.changeRate) }}</span>
-              </li>
-            </ul>
-          </div>
+            <nav class="td-navgroup">
+              <span class="td-navgroup-label">FORGE</span>
+              <button class="td-navitem" type="button" @click="openDraftOrders">
+                <i class="ph ph-scroll"></i><span>Draft Orders</span>
+              </button>
+            </nav>
 
-          <div id="risk-anchor" class="data-col">
-            <div class="col-header">규제 준수</div>
-            <ul class="data-list">
-              <li v-for="row in complianceRows" :key="row.key" class="data-row">
-                <span class="row-key">{{ row.key }}</span>
-                <span class="row-val">{{ row.value }}</span>
-              </li>
-              <li class="data-row">
-                <span class="row-key">COMMITTEE_STATE</span>
-                <span class="row-val">{{ committeeState }}</span>
-              </li>
-              <li class="data-row">
-                <span class="row-key">BROKER_STATE</span>
-                <span class="row-val">{{ brokerLabel }}</span>
-              </li>
-            </ul>
-          </div>
+            <div class="td-navgroup td-navgroup-foot td-system">
+              <span class="td-navgroup-label">SYSTEM</span>
+              <div class="td-sys-brand">
+                <span class="td-sys-dot"></span>
+                <span class="td-sys-name">LIBRA</span>
+                <span class="td-sys-op">시스템 운영</span>
+              </div>
+              <button class="td-navitem td-sys-btn" type="button" @click="toggleTheme">
+                <i class="ph" :class="isDarkTheme ? 'ph-moon' : 'ph-sun'"></i><span>{{ isDarkTheme ? '다크' : '라이트' }}</span>
+              </button>
+              <button class="td-navitem td-sys-btn" type="button" @click="onLogout">
+                <i class="ph ph-sign-out"></i><span>로그아웃</span>
+              </button>
+            </div>
+          </aside>
 
-          <div class="data-col">
-            <div class="col-header">자동 리밸런스 로그</div>
-            <ul id="log-list" class="data-list log-list">
-              <li v-for="row in logRows" :key="row.key" class="data-row" :class="row.tone">
-                <span class="row-key">{{ row.time }} {{ row.label }}</span>
-                <span v-if="row.detail" class="row-val">{{ row.detail }}</span>
-              </li>
-            </ul>
-          </div>
+          <section class="td-main">
+            <div class="td-center-view" :class="{ hidden: terminalCenterView !== 'overview' }">
+              <header class="td-hero">
+                <div class="td-hero-value">{{ formatMoney(displayTotalValue) }}</div>
+                <div class="td-hero-meta">
+                  <span class="td-meta-block"><span class="td-meta-label">TOTAL ASSET VALUE</span></span>
+                  <span class="td-meta-block">
+                    <span class="td-meta-label">PROFIT</span>
+                    <span :class="displayTotalProfit >= 0 ? 'td-meta-pos' : 'td-meta-neg'">{{ formatUnsignedKrw(displayTotalProfit).replace('₩ ', '') }}</span>
+                  </span>
+                  <span class="td-meta-block"><span class="td-meta-label">CURRENCY</span> <span class="td-meta-val">KRW</span></span>
+                  <span class="td-meta-block"><span class="td-meta-label">SOURCE</span> <span class="td-meta-val">{{ portfolioDataSource }}</span></span>
+                </div>
+              </header>
+
+              <div class="td-cardrow">
+                <article class="td-card td-consensus" @click="selectDashboardSubject(terminalConsensus.top?.ticker || activeDecisionSubject, 'history')">
+                  <div class="td-card-head">
+                    <span class="td-card-title">AI AGENT CONSENSUS</span>
+                    <span class="td-badge" :class="terminalConsensus.badgeClass">{{ terminalConsensus.badge }}</span>
+                  </div>
+                  <h2 class="td-consensus-headline">
+                    <template v-if="terminalConsensus.action !== 'HOLD' && terminalConsensus.top">
+                      {{ terminalConsensus.verb }}
+                      <em :class="terminalConsensus.directionClass">{{ terminalConsensus.top.ticker }}</em>
+                      {{ terminalConsensus.magnitude }}% Recommended
+                    </template>
+                    <template v-else>Hold — portfolio within target bands</template>
+                  </h2>
+                  <div class="td-consensus-legend">
+                    <span>INCREASE</span><span class="td-leg-mid">HOLD</span><span>DECREASE</span>
+                  </div>
+                  <div class="td-consensus-bar">
+                    <div class="td-bar-seg td-bar-inc" :style="{ width: `${(terminalConsensus.nInc / terminalConsensus.total) * 100}%` }"></div>
+                    <div class="td-bar-seg td-bar-hold" :style="{ width: `${(terminalConsensus.nHold / terminalConsensus.total) * 100}%` }"></div>
+                    <div class="td-bar-seg td-bar-dec" :style="{ width: `${(terminalConsensus.nDec / terminalConsensus.total) * 100}%` }"></div>
+                  </div>
+                  <div class="td-consensus-counts">
+                    <span>{{ terminalConsensus.nInc }} AGENTS</span>
+                    <span class="td-leg-mid">{{ terminalConsensus.nHold }} AGENTS</span>
+                    <span>{{ terminalConsensus.nDec }} AGENTS</span>
+                  </div>
+                  <p class="td-consensus-desc">{{ terminalConsensusDescription }}</p>
+                </article>
+
+                <article class="td-card td-holdings">
+                  <div class="td-card-head"><span class="td-card-title">PORTFOLIO HOLDINGS</span></div>
+                  <ul class="td-holdings-list">
+                    <li v-for="asset in terminalAssets" :key="asset.key" class="td-holding" @click="selectDashboardSubject(asset.ticker, 'history')">
+                      <div class="td-holding-row">
+                        <span class="td-holding-ticker">{{ asset.ticker }}</span>
+                        <span class="td-holding-name">{{ asset.name }}</span>
+                        <span class="td-holding-alloc">{{ asset.allocationLabel }}</span>
+                        <span class="td-holding-pl" :class="asset.profitClass">{{ asset.profitLabel }}</span>
+                      </div>
+                      <span class="td-holding-track">
+                        <span class="td-holding-fill" :style="{ width: `${Math.min(asset.weightPct, 100)}%`, background: asset.color }"></span>
+                      </span>
+                    </li>
+                  </ul>
+                </article>
+              </div>
+
+              <article class="td-card td-chart">
+                <div class="td-card-head">
+                  <span class="td-card-title">PORTFOLIO VALUE (90D)</span>
+                  <span class="td-chart-delta">{{ terminalTrendSvg.deltaLabel }}</span>
+                </div>
+                <div class="td-chart-canvas">
+                  <svg viewBox="0 0 1000 180" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="tdChartFillVue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.38" />
+                        <stop offset="100%" stop-color="#3b82f6" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path :d="terminalTrendSvg.areaPath" fill="url(#tdChartFillVue)" />
+                    <path :d="terminalTrendSvg.linePath" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+                    <circle :cx="terminalTrendSvg.endX" :cy="terminalTrendSvg.endY" r="4" fill="#3b82f6" />
+                  </svg>
+                </div>
+                <div class="td-chart-axis">
+                  <span>MAR</span><span>APR</span><span>MAY</span><span>CURRENT</span>
+                </div>
+              </article>
+            </div>
+
+            <div class="td-center-view td-calendar-panel" :class="{ hidden: terminalCenterView !== 'calendar' }">
+              <article class="td-card td-calendar-card">
+                <div class="td-card-head">
+                  <span class="td-card-title">REBALANCE CALENDAR</span>
+                  <span class="td-badge td-badge-hold">T+2 GATE</span>
+                </div>
+                <div class="td-calendar-grid">
+                  <span v-for="node in memoryNodes.slice(-35)" :key="node.key" class="td-calendar-cell" :class="`level-${node.level}`">
+                    <span>{{ node.key.slice(8, 10) }}</span>
+                  </span>
+                </div>
+                <p class="td-consensus-desc">최근 의사결정 기록과 T+2 재판단 예정일을 함께 확인합니다.</p>
+              </article>
+            </div>
+          </section>
+
+          <aside class="td-rail td-rail-right">
+            <div class="td-section">
+              <span class="td-section-label">AGENT OPINIONS</span>
+              <div class="td-opinions">
+                <div v-for="opinion in terminalOpinionRows" :key="opinion.key" class="td-opinion" :class="opinion.tone">
+                  <div class="td-opinion-head">
+                    <span class="td-opinion-domain">{{ opinion.domain }}</span>
+                    <span class="td-opinion-verdict" :class="opinion.tone">{{ opinion.verdict }}</span>
+                  </div>
+                  <div class="td-opinion-text">{{ opinion.text }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="td-section">
+              <span class="td-section-label">COMPLIANCE CHECK</span>
+              <div class="td-card td-compliance">
+                <div class="td-card-head">
+                  <span class="td-card-title">SAFETY STATUS</span>
+                  <span class="td-badge" :class="terminalSafetyPass ? 'td-badge-pass' : 'td-badge-conflict'">
+                    {{ terminalSafetyPass ? 'PASS' : 'REVIEW' }}
+                  </span>
+                </div>
+                <ul class="td-checklist">
+                  <li v-for="check in terminalComplianceRows" :key="check.key" class="td-check" :class="{ warn: !check.ok }">
+                    <i class="ph" :class="check.ok ? 'ph-check-circle' : 'ph-warning'"></i>
+                    <span>{{ check.label }}</span>
+                    <span class="td-check-val">{{ check.value }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <button class="td-execute" type="button" :disabled="runStream.isStreaming" @click="startAgentRun">
+              <i class="ph ph-lightning"></i>
+              <span>{{ runStream.isStreaming ? 'REBALANCING RUNNING' : 'EXECUTE REBALANCING' }}</span>
+            </button>
+          </aside>
         </div>
       </div>
 
@@ -1517,6 +2424,16 @@ function errorMessage(err: unknown): string {
           </div>
           <button type="button" class="btn-back-dashboard" @click="setActiveTab('dashboard')">
             <i class="ph ph-arrow-left"></i> <span>back to dashboard</span>
+          </button>
+        </div>
+
+        <div v-if="selectedDashboardSubject" class="agent-subject-bar">
+          <span class="agent-current-subject">
+            <span class="agent-current-subject-label">분석 종목</span>
+            <span class="agent-current-subject-value">{{ selectedDashboardSubject }}</span>
+          </span>
+          <button type="button" class="agent-subject-clear" aria-label="선택 해제" @click="clearDashboardSubject">
+            <i class="ph ph-x"></i>
           </button>
         </div>
 
@@ -1832,42 +2749,57 @@ function errorMessage(err: unknown): string {
                       <div class="node-glow-bg"></div>
                       <i class="ph-bold ph-briefcase node-icon"></i>
                       <div class="node-info">
-                        <h4>CORE COUNCIL</h4>
-                        <span class="node-status-text">Orchestrating</span>
+                        <h4>{{ flowNodeTitle('core') }}</h4>
+                        <span class="node-status-text">{{ flowNodeRuntimeText('core') }}</span>
+                        <div class="node-agent-stack">
+                          <span v-for="chip in flowNodeAgentChips('core')" :key="`core-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                        </div>
                       </div>
                     </div>
 
                     <div class="flow-nodes-row">
                       <div id="node-agent-risk" class="flow-node-card node-middle" :class="flowNodeClass('risk')">
-                        <div class="node-glow-bg"></div>
-                        <i class="ph-bold ph-shield-check node-icon risk"></i>
-                        <div class="node-info">
-                          <h4>RISK AGENT</h4>
-                          <span class="node-status-text">Risk & Liquidity</span>
+                      <div class="node-glow-bg"></div>
+                      <i class="ph-bold ph-shield-check node-icon risk"></i>
+                      <div class="node-info">
+                          <h4>{{ flowNodeTitle('risk') }}</h4>
+                          <span class="node-status-text">{{ flowNodeRuntimeText('risk') }}</span>
+                          <div class="node-agent-stack">
+                            <span v-for="chip in flowNodeAgentChips('risk')" :key="`risk-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                          </div>
                         </div>
                       </div>
                       <div id="node-agent-macro" class="flow-node-card node-middle" :class="flowNodeClass('macro')">
                         <div class="node-glow-bg"></div>
                         <i class="ph-bold ph-globe node-icon macro"></i>
                         <div class="node-info">
-                          <h4>PROFIT AGENT</h4>
-                          <span class="node-status-text">Return Signals</span>
+                          <h4>{{ flowNodeTitle('macro') }}</h4>
+                          <span class="node-status-text">{{ flowNodeRuntimeText('macro') }}</span>
+                          <div class="node-agent-stack">
+                            <span v-for="chip in flowNodeAgentChips('macro')" :key="`macro-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                          </div>
                         </div>
                       </div>
                       <div id="node-agent-tax" class="flow-node-card node-middle" :class="flowNodeClass('cost')">
                         <div class="node-glow-bg"></div>
                         <i class="ph-bold ph-receipt node-icon tax"></i>
                         <div class="node-info">
-                          <h4>COST AGENT</h4>
-                          <span class="node-status-text">Turnover Gate</span>
+                          <h4>{{ flowNodeTitle('cost') }}</h4>
+                          <span class="node-status-text">{{ flowNodeRuntimeText('cost') }}</span>
+                          <div class="node-agent-stack">
+                            <span v-for="chip in flowNodeAgentChips('cost')" :key="`cost-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                          </div>
                         </div>
                       </div>
                       <div id="node-agent-sentiment" class="flow-node-card node-middle" :class="flowNodeClass('news')">
                         <div class="node-glow-bg"></div>
                         <i class="ph-bold ph-chat-circle-text node-icon sentiment"></i>
                         <div class="node-info">
-                          <h4>EVIDENCE NODE</h4>
-                          <span class="node-status-text">News / Reports / DART</span>
+                          <h4>{{ flowNodeTitle('news') }}</h4>
+                          <span class="node-status-text">{{ flowNodeRuntimeText('news') }}</span>
+                          <div class="node-agent-stack">
+                            <span v-for="chip in flowNodeAgentChips('news')" :key="`news-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1876,8 +2808,11 @@ function errorMessage(err: unknown): string {
                       <div class="node-glow-bg"></div>
                       <i class="ph-bold ph-scales node-icon mediator"></i>
                       <div class="node-info">
-                        <h4>MEDIATOR JUDGE</h4>
-                        <span class="node-status-text">Resolving Conflicts</span>
+                        <h4>{{ flowNodeTitle('mediator') }}</h4>
+                        <span class="node-status-text">{{ flowNodeRuntimeText('mediator') }}</span>
+                        <div class="node-agent-stack">
+                          <span v-for="chip in flowNodeAgentChips('mediator')" :key="`mediator-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1885,8 +2820,11 @@ function errorMessage(err: unknown): string {
                       <div class="node-glow-bg"></div>
                       <i class="ph-bold ph-gavel node-icon judge"></i>
                       <div class="node-info">
-                        <h4>FINAL JUDGE</h4>
-                        <span class="node-status-text">Approving Strategy</span>
+                        <h4>{{ flowNodeTitle('judge') }}</h4>
+                        <span class="node-status-text">{{ flowNodeRuntimeText('judge') }}</span>
+                        <div class="node-agent-stack">
+                          <span v-for="chip in flowNodeAgentChips('judge')" :key="`judge-${chip}`" class="node-agent-chip">{{ chip }}</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1900,6 +2838,7 @@ function errorMessage(err: unknown): string {
                   <div class="status-phase">
                     <span class="status-label">CURRENT PHASE</span>
                     <h3>{{ agentPhaseLabel }}</h3>
+                    <div class="flow-status-summary">{{ flowStatusSummary() }}</div>
                   </div>
                   <div class="status-time">
                     <span class="status-label">SESSION TIME</span>
@@ -1942,19 +2881,19 @@ function errorMessage(err: unknown): string {
 
               <div class="metric-cards-grid">
                 <div class="metric-mini-card">
-                  <span class="metric-label">TARGET ALLOC</span>
-                  <div class="metric-val">{{ holdingRows.length }} ASSETS</div>
-                  <span class="metric-sub">KIS live balance</span>
+                  <span class="metric-label">ROUND 1</span>
+                  <div class="metric-val">{{ councilFlowState.round1Count || '-' }}</div>
+                  <span class="metric-sub">parallel opinions</span>
                 </div>
                 <div class="metric-mini-card">
-                  <span class="metric-label">RISK SCORE</span>
-                  <div class="metric-val text-orange">{{ totalProfitRate >= 0 ? 'WATCH' : 'RISK' }}</div>
-                  <span class="metric-sub">Policy constraints</span>
+                  <span class="metric-label">ROUND 2</span>
+                  <div class="metric-val text-orange">{{ councilFlowState.round2Count || 0 }}</div>
+                  <span class="metric-sub">{{ councilFlowState.round2Targets.length ? councilFlowState.round2Targets.slice(0, 2).join(', ') : 'no recall yet' }}</span>
                 </div>
                 <div class="metric-mini-card">
-                  <span class="metric-label">REBALANCE</span>
-                  <div class="metric-val">{{ committeeState }}</div>
-                  <span class="metric-sub">Consensus</span>
+                  <span class="metric-label">EVIDENCE</span>
+                  <div class="metric-val">{{ councilFlowState.evidenceEvents + councilFlowState.evidenceDocuments }}</div>
+                  <span class="metric-sub">events + documents</span>
                 </div>
               </div>
 
@@ -2415,6 +3354,803 @@ function errorMessage(err: unknown): string {
   white-space: pre-line;
 }
 
+.jy-dashboard-host .notch-nav {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.jy-dashboard-host .notch-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.jy-dashboard-host .notch-link,
+.jy-dashboard-host .notch-lang-toggle,
+.jy-dashboard-host .notch-actions {
+  flex: 0 0 auto;
+}
+
+.jy-dashboard-host .notch-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.jy-dashboard-host .notch-action-btn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.jy-dashboard-host .notch-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.jy-dashboard-host .notch-notif-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #111318;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 15px;
+}
+
+.jy-dashboard-host .zone-dark.dashboard-zone-compact {
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.jy-dashboard-host.dashboard-tab-active #dashboard-page {
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(115% 75% at 50% -12%, rgba(124, 92, 252, 0.13) 0%, transparent 55%),
+    radial-gradient(70% 55% at 88% 112%, rgba(124, 92, 252, 0.10) 0%, transparent 52%),
+    radial-gradient(65% 55% at 6% 108%, rgba(70, 90, 180, 0.08) 0%, transparent 50%),
+    #08080c;
+}
+
+.jy-dashboard-host.dashboard-tab-active .zone-light {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 36px 48px;
+  background: transparent;
+}
+
+.jy-dashboard-host.dashboard-tab-active #tab-dashboard {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-dash {
+  --td-blue: #3b82f6;
+  --td-green: #22c55e;
+  --td-red: #ef4444;
+  --td-gold: #f59e0b;
+  --td-card-bg: rgba(255, 255, 255, 0.018);
+  --td-card-border: rgba(255, 255, 255, 0.07);
+  --td-card-border-hover: rgba(255, 255, 255, 0.14);
+  --td-label: rgba(255, 255, 255, 0.42);
+  --td-text: rgba(255, 255, 255, 0.92);
+  --td-text-dim: rgba(255, 255, 255, 0.6);
+  --td-track: rgba(255, 255, 255, 0.07);
+  width: 100%;
+  max-width: 1680px;
+  margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr) 284px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  font-family: var(--font-body);
+}
+
+.terminal-dash .td-navgroup-label,
+.terminal-dash .td-section-label,
+.terminal-dash .td-card-title,
+.terminal-dash .td-meta-label,
+.terminal-dash .td-consensus-legend,
+.terminal-dash .td-chart-delta,
+.terminal-dash .td-chart-axis,
+.terminal-dash .td-badge {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.terminal-dash .td-card {
+  background: var(--td-card-bg);
+  border: 1px solid var(--td-card-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  transition: border-color 0.18s ease;
+}
+
+.terminal-dash .td-card:hover { border-color: var(--td-card-border-hover); }
+
+.terminal-dash .td-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.terminal-dash .td-card-title {
+  font-size: 11px;
+  color: var(--td-label);
+}
+
+.terminal-dash .td-rail-left,
+.terminal-dash .td-rail-right {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.terminal-dash .td-rail-left::-webkit-scrollbar,
+.terminal-dash .td-rail-right::-webkit-scrollbar,
+.terminal-dash .td-center-view::-webkit-scrollbar {
+  display: none;
+}
+
+.terminal-dash .td-rail-left {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.terminal-dash .td-navgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.terminal-dash .td-navgroup-foot { margin-top: auto; }
+
+.terminal-dash .td-navgroup-label {
+  font-size: 9px;
+  color: var(--td-label);
+  padding: 0 12px 6px;
+}
+
+.terminal-dash .td-navitem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--td-text-dim);
+  font-size: 13px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.terminal-dash .td-navitem i {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+.terminal-dash .td-navitem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--td-text);
+}
+
+.terminal-dash .td-navitem.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--td-text);
+}
+
+.terminal-dash .td-navitem.active i {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
+.terminal-dash .td-system { gap: 5px; }
+
+.terminal-dash .td-sys-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px 8px;
+}
+
+.terminal-dash .td-sys-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary);
+  flex-shrink: 0;
+}
+
+.terminal-dash .td-sys-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--td-text);
+  font-size: 14px;
+}
+
+.terminal-dash .td-sys-op {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--td-label);
+  text-transform: uppercase;
+}
+
+.terminal-dash .td-main,
+.terminal-dash .td-center-view {
+  min-width: 0;
+  min-height: 0;
+}
+
+.terminal-dash .td-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+}
+
+.terminal-dash .td-center-view {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  scrollbar-gutter: stable;
+}
+
+.terminal-dash .td-hero {
+  border: 1px solid var(--td-card-border);
+  background: var(--td-card-bg);
+  border-radius: 16px;
+  padding: 20px 26px;
+}
+
+.terminal-dash .td-hero-value {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(34px, 4.3vw, 58px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--td-text);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 28px rgba(255, 255, 255, 0.06);
+}
+
+.terminal-dash .td-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 14px;
+}
+
+.terminal-dash .td-meta-block {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.terminal-dash .td-meta-label {
+  font-size: 10px;
+  color: var(--td-label);
+}
+
+.terminal-dash .td-meta-val,
+.terminal-dash .td-meta-pos,
+.terminal-dash .td-meta-neg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.terminal-dash .td-meta-val { color: var(--td-text-dim); }
+.terminal-dash .td-meta-pos { color: var(--td-green); }
+.terminal-dash .td-meta-neg { color: var(--td-red); }
+
+.terminal-dash .td-cardrow {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 18px;
+}
+
+.terminal-dash .td-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+}
+
+.terminal-dash .td-badge-conflict {
+  color: var(--td-gold);
+  background: rgba(245, 158, 11, 0.13);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.terminal-dash .td-badge-consensus,
+.terminal-dash .td-badge-pass {
+  color: var(--td-green);
+  background: rgba(34, 197, 94, 0.13);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.terminal-dash .td-badge-hold {
+  color: var(--td-text-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--td-card-border);
+}
+
+.terminal-dash .td-consensus {
+  cursor: pointer;
+}
+
+.terminal-dash .td-consensus-headline {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--td-text);
+}
+
+.terminal-dash .td-consensus-headline em {
+  font-style: normal;
+  color: var(--td-red);
+}
+
+.terminal-dash .td-consensus-headline em.up { color: var(--td-green); }
+
+.terminal-dash .td-consensus-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--td-label);
+  margin-bottom: 8px;
+}
+
+.terminal-dash .td-consensus-legend .td-leg-mid,
+.terminal-dash .td-consensus-counts .td-leg-mid {
+  flex: 1;
+  text-align: center;
+}
+
+.terminal-dash .td-consensus-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--td-track);
+}
+
+.terminal-dash .td-bar-seg { height: 100%; }
+.terminal-dash .td-bar-inc { background: var(--td-green); }
+.terminal-dash .td-bar-hold { background: rgba(255, 255, 255, 0.22); }
+.terminal-dash .td-bar-dec { background: var(--td-red); }
+
+.terminal-dash .td-consensus-counts {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--td-text-dim);
+}
+
+.terminal-dash .td-consensus-desc {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--td-text-dim);
+}
+
+.terminal-dash .td-holdings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.terminal-dash .td-holding {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.terminal-dash .td-holding-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.terminal-dash .td-holding-ticker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--td-text);
+}
+
+.terminal-dash .td-holding-name {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--td-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-dash .td-holding-alloc {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--td-text-dim);
+  white-space: nowrap;
+}
+
+.terminal-dash .td-holding-pl {
+  min-width: 48px;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.terminal-dash .td-holding-pl.pos { color: var(--td-green); }
+.terminal-dash .td-holding-pl.neg { color: var(--td-red); }
+.terminal-dash .td-holding-pl.flat { color: var(--td-label); }
+
+.terminal-dash .td-holding-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--td-track);
+  overflow: hidden;
+}
+
+.terminal-dash .td-holding-fill {
+  display: block;
+  height: 100%;
+  min-width: 6px;
+  border-radius: 4px;
+  transition: width 0.28s ease;
+}
+
+.terminal-dash .td-chart {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-dash .td-chart-delta {
+  font-size: 11px;
+  color: var(--td-green);
+}
+
+.terminal-dash .td-chart-canvas {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 150px;
+}
+
+.terminal-dash .td-chart-canvas svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.terminal-dash .td-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 9px;
+  color: var(--td-label);
+}
+
+.terminal-dash .td-rail-right {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.terminal-dash .td-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.terminal-dash .td-section-label {
+  font-size: 10px;
+  color: var(--td-label);
+}
+
+.terminal-dash .td-opinions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.terminal-dash .td-opinion {
+  background: var(--td-card-bg);
+  border: 1px solid var(--td-card-border);
+  border-left: 3px solid var(--td-card-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.terminal-dash .td-opinion.dec { border-left-color: var(--td-red); }
+.terminal-dash .td-opinion.inc { border-left-color: var(--td-green); }
+.terminal-dash .td-opinion.hold { border-left-color: var(--td-blue); }
+
+.terminal-dash .td-opinion-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.terminal-dash .td-opinion-domain {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--td-text);
+  font-weight: 600;
+}
+
+.terminal-dash .td-opinion-verdict {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.terminal-dash .td-opinion-verdict.dec { color: var(--td-red); }
+.terminal-dash .td-opinion-verdict.inc { color: var(--td-green); }
+.terminal-dash .td-opinion-verdict.hold { color: var(--td-blue); }
+
+.terminal-dash .td-opinion-text {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--td-text-dim);
+}
+
+.terminal-dash .td-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.terminal-dash .td-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--td-text);
+}
+
+.terminal-dash .td-check i {
+  color: var(--td-green);
+  font-size: 16px;
+}
+
+.terminal-dash .td-check.warn i { color: var(--td-gold); }
+
+.terminal-dash .td-check .td-check-val {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--td-label);
+}
+
+.terminal-dash .td-execute {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: auto;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ffffff, #f6f3ed);
+  color: #1c1206;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  box-shadow: 0 8px 28px rgba(255, 255, 255, 0.16);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.terminal-dash .td-execute:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 34px rgba(255, 255, 255, 0.22);
+}
+
+.terminal-dash .td-execute:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+  box-shadow: none;
+}
+
+.terminal-dash .td-calendar-card {
+  min-height: 100%;
+}
+
+.terminal-dash .td-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.terminal-dash .td-calendar-cell {
+  min-height: 58px;
+  border: 1px solid var(--td-card-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--td-text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 8px;
+}
+
+.terminal-dash .td-calendar-cell.level-1 { background: rgba(59, 130, 246, 0.08); }
+.terminal-dash .td-calendar-cell.level-2 { background: rgba(59, 130, 246, 0.14); }
+.terminal-dash .td-calendar-cell.level-3 { background: rgba(34, 197, 94, 0.16); }
+.terminal-dash .td-calendar-cell.level-4 { background: rgba(245, 158, 11, 0.18); border-color: rgba(245, 158, 11, 0.32); }
+
+.jy-dashboard-host #dashboard-zone-transition {
+  display: none;
+}
+
+.jy-dashboard-host .hud-btn,
+.jy-dashboard-host .hud-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.jy-dashboard-host .hud-btn {
+  min-width: 74px;
+}
+
+.jy-dashboard-host .hud-btn span,
+.jy-dashboard-host .hud-btn-primary span {
+  white-space: nowrap;
+}
+
+.jy-dashboard-host .summary-subject-row,
+.jy-dashboard-host .chart-card[data-nav],
+.jy-dashboard-host .chart-card-main {
+  cursor: pointer;
+}
+
+.jy-dashboard-host .summary-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+
+.jy-dashboard-host .summary-main-action,
+.jy-dashboard-host .summary-main-separator {
+  flex: 0 0 auto;
+}
+
+.jy-dashboard-host .summary-main-separator {
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.jy-dashboard-host .consensus-vue-body,
+.jy-dashboard-host .trend-vue-body {
+  min-height: 210px;
+}
+
+.jy-dashboard-host .consensus-bars {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.jy-dashboard-host .consensus-bar-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.jy-dashboard-host .consensus-bar-track {
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.jy-dashboard-host .consensus-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.jy-dashboard-host .consensus-bar-fill.is-increase {
+  background: #4ade80;
+}
+
+.jy-dashboard-host .consensus-bar-fill.is-hold {
+  background: #94a3b8;
+}
+
+.jy-dashboard-host .consensus-bar-fill.is-decrease {
+  background: #f87171;
+}
+
+.jy-dashboard-host .trend-vue-body {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding: 22px 18px;
+}
+
+.jy-dashboard-host .trend-vue-bar {
+  flex: 1;
+  min-width: 8px;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(244, 117, 33, 0.68));
+  box-shadow: 0 0 18px rgba(244, 117, 33, 0.18);
+}
+
 .jy-dashboard-host #agent-view-init .deadlock-hud-top {
   align-items: center;
 }
@@ -2730,6 +4466,57 @@ function errorMessage(err: unknown): string {
   animation: libra-lightning-pulse 1s ease-in-out infinite;
 }
 
+.jy-dashboard-host #agent-view-running .node-agent-stack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 7px;
+}
+
+.jy-dashboard-host #agent-view-running .node-agent-chip {
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: rgba(16, 18, 22, 0.62);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.dark-theme .jy-dashboard-host #agent-view-running .node-agent-chip,
+.jy-dashboard-host.dark-theme #agent-view-running .node-agent-chip {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.jy-dashboard-host #agent-view-running .flow-node-card.status-active .node-agent-chip {
+  border-color: rgba(244, 117, 33, 0.3);
+  color: #f47521;
+}
+
+.jy-dashboard-host #agent-view-running .flow-node-card.status-complete .node-agent-chip {
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #22c55e;
+}
+
+.jy-dashboard-host #agent-view-running .flow-status-summary {
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(244, 117, 33, 0.92);
+}
+
 .jy-dashboard-host #agent-view-running .state-pulse-dot.active::after {
   animation: libra-live-ping 1.2s ease-out infinite;
 }
@@ -2779,6 +4566,74 @@ function errorMessage(err: unknown): string {
   100% {
     opacity: 0;
     transform: scale(1.6);
+  }
+}
+
+@media (max-width: 1100px) {
+  .jy-dashboard-host.dashboard-tab-active #dashboard-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .jy-dashboard-host.dashboard-tab-active .zone-light {
+    overflow: visible;
+    padding-inline: 20px;
+  }
+
+  .terminal-dash {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .terminal-dash .td-rail-left,
+  .terminal-dash .td-rail-right,
+  .terminal-dash .td-center-view {
+    overflow: visible;
+  }
+
+  .terminal-dash .td-rail-left {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .terminal-dash .td-navgroup-foot {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .jy-dashboard-host .notch-nav {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+
+  .jy-dashboard-host .notch-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .terminal-dash .td-cardrow {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-dash .td-hero-value {
+    font-size: 34px;
+  }
+
+  .terminal-dash .td-holding-row {
+    flex-wrap: wrap;
+  }
+
+  .terminal-dash .td-holding-alloc {
+    margin-left: 0;
+  }
+
+  .terminal-dash .td-calendar-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
