@@ -1280,25 +1280,56 @@ async function startAgentRun() {
 }
 
 function currentPortfolioPayload(): Record<string, unknown> {
+  const generatedAt = new Date().toISOString()
+  const safeTotalValue = totalValue.value > 0 ? totalValue.value : holdings.value.reduce((sum, holding) => {
+    return sum + (toNumber(holding.valuationAmount) ?? 0)
+  }, 0)
+  const safeTotal = safeTotalValue > 0 ? safeTotalValue : 1
   return {
+    generated_at: generatedAt,
+    total_value_krw: safeTotalValue,
+    cash_weight: Math.max(0, Math.min(1, cashWeight.value)),
     source: balance.value ? 'kis_live_balance' : snapshotBalance.value ? 'portfolio_snapshot' : 'dashboard_fallback',
-    as_of: new Date().toISOString(),
+    as_of: generatedAt,
     snapshot_id: balance.value?.snapshotId || snapshotBalance.value?.snapshotId || latestSnapshot.value?.id || null,
     data_source: portfolioDataSource.value,
     summary: visibleSummary.value,
     holdings: holdings.value.map((holding) => {
       const valuation = toNumber(holding.valuationAmount) ?? 0
-      return {
+      const symbol = holding.symbol.trim()
+      const payload: Record<string, unknown> = {
+        ticker: symbol,
         symbol: holding.symbol,
+        company_name: holding.name || symbol,
         name: holding.name,
+        aliases: [symbol, holding.name].filter(Boolean),
+        shares: toNumber(holding.quantity),
         quantity: toNumber(holding.quantity),
+        last_price: toNumber(holding.currentPrice),
+        average_price: toNumber(holding.averagePrice),
+        market_value_krw: valuation,
         valuation_amount: valuation,
-        weight: totalValue.value > 0 ? valuation / totalValue.value : null,
+        weight: Math.max(0, Math.min(1, valuation / safeTotal)),
+        unrealized_pnl_krw: toNumber(holding.profitLossAmount),
         profit_loss_amount: toNumber(holding.profitLossAmount),
         profit_loss_rate: toNumber(holding.profitLossRate)
       }
-    })
+      const marketCode = inferKisMarketCode(symbol)
+      if (marketCode) {
+        payload.market_code = marketCode
+        payload.marketCode = marketCode
+      }
+      return payload
+    }).filter((holding) => {
+      return String(holding.ticker || '').trim()
+        && ((Number(holding.weight) || 0) > 0 || (Number(holding.shares) || 0) > 0)
+    }),
+    user_preferences: ['KIS 실잔고 기준', '무리한 회전율 회피', '리스크 우선']
   }
+}
+
+function inferKisMarketCode(symbol: string): string | null {
+  return /^\d{6}$/.test(symbol.trim()) ? 'J' : null
 }
 
 function currentGovernancePayload(): Record<string, unknown> {
