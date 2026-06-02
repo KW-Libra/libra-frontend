@@ -5070,6 +5070,281 @@
   color: #e2e8f0 !important;
 }
 
+/* Running view collision guard */
+#agent-view-running.agent-vis-layout {
+  grid-template-columns: minmax(760px, 1.5fr) minmax(420px, 1fr);
+  align-items: start !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+#agent-view-running .agent-flow-column,
+#agent-view-running .agent-console-column {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+#agent-view-running .agent-vis-card.flow-board {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+#agent-view-running .agent-vis-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px !important;
+}
+
+#agent-view-running .header-actions-area {
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+#agent-view-running .header-title-area {
+  min-width: 0;
+  padding-right: clamp(190px, 24vw, 250px);
+}
+
+#agent-view-running .header-title-area h2 {
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+#agent-view-running .agent-flow-canvas {
+  flex: 0 0 700px !important;
+  height: 700px !important;
+  min-height: 700px !important;
+  margin: 8px 0 18px !important;
+  overflow: hidden !important;
+}
+
+#agent-view-running .flow-node-card {
+  width: 178px !important;
+  min-height: 124px;
+  box-sizing: border-box;
+}
+
+#agent-view-running .node-top {
+  top: 18px !important;
+}
+
+#agent-view-running .flow-nodes-row {
+  top: 190px !important;
+  justify-content: center !important;
+  gap: clamp(12px, 1.6vw, 24px) !important;
+  padding: 0 20px !important;
+  box-sizing: border-box;
+}
+
+#agent-view-running .node-bottom-1 {
+  top: 380px !important;
+}
+
+#agent-view-running .node-bottom-2 {
+  top: 535px !important;
+}
+
+#agent-view-running .flow-node-dot {
+  top: 690px !important;
+}
+
+#agent-view-running .agent-flow-status-bar {
+  margin-top: 0 !important;
+}
+
+#agent-view-running .agent-console-column {
+  position: static !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 18px !important;
+}
+
+#agent-view-running .transcript-card {
+  flex: 0 0 auto !important;
+  min-height: 360px !important;
+  max-height: 430px !important;
+}
+
+#agent-view-running .metric-cards-grid {
+  flex: 0 0 auto;
+}
+
+#agent-view-running .control-card {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1420px) {
+  #agent-view-running.agent-vis-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #agent-view-running .agent-console-column {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  #agent-view-running .state-card {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #agent-view-running .control-card {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  #agent-view-running .transcript-card,
+  #agent-view-running .metric-cards-grid {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  #agent-view-running .agent-vis-card.flow-board {
+    padding: 24px 20px 24px !important;
+  }
+
+  #agent-view-running .header-title-area {
+    padding-right: 0;
+  }
+
+  #agent-view-running .header-title-area h2 {
+    font-size: clamp(30px, 8.4vw, 36px) !important;
+    line-height: 1.08 !important;
+  }
+
+  #agent-view-running .header-title-area .vis-badge {
+    position: static;
+    margin-bottom: 8px;
+  }
+
+  #agent-view-running .agent-flow-canvas {
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    overflow: visible !important;
+  }
+
+  #agent-view-running .agent-connections-svg {
+    display: none;
+  }
+
+  #agent-view-running .agent-nodes-layer {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: auto;
+  }
+
+  #agent-view-running .flow-node-card,
+  #agent-view-running .node-top,
+  #agent-view-running .node-bottom-1,
+  #agent-view-running .node-bottom-2 {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    min-height: 0;
+  }
+
+  #agent-view-running .flow-nodes-row {
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px !important;
+    padding: 0 !important;
+  }
+
+  #agent-view-running .flow-node-dot {
+    display: none;
+  }
+
+  #agent-view-running .agent-flow-status-bar {
+    border-radius: 20px;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  #agent-view-running .transcript-feed-area .debate-sender {
+    flex-direction: column;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 4px;
+  }
+
+  #agent-view-running .transcript-feed-area .sender-name {
+    white-space: nowrap;
+  }
+
+  #agent-view-running .transcript-feed-area .sender-role {
+    max-width: 100%;
+    white-space: normal;
+    font-size: 10px !important;
+    line-height: 1.4;
+  }
+
+  #agent-view-running .agent-console-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #agent-view-running .state-card,
+  #agent-view-running .control-card {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  #agent-view-running .transcript-card {
+    max-height: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #agent-view-running .flow-nodes-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #agent-view-running .metric-cards-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #agent-view-running .control-card {
+    padding: 16px 10px 0 !important;
+  }
+
+  #agent-view-running .control-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 0 !important;
+  }
+
+  #agent-view-running .meta-item {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  #agent-view-running .meta-val {
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: normal;
+  }
+
+  #agent-view-running .btn-analysis-toggle {
+    height: 62px !important;
+    font-size: 16px !important;
+  }
+}
+
 /* ==========================================================================
    AGENT COUNCIL MANAGEMENT — ON/OFF + 모델 + 상태 + 마지막 액션 통합 카드
    (Settings 탭 내부 / 시안 'Agent Council Management' 일치)

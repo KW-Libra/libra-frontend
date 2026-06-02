@@ -2731,46 +2731,46 @@ function errorMessage(err: unknown): string {
                 </div>
 
                 <div class="agent-flow-canvas" id="agent-flow-canvas-area">
-                  <svg class="agent-connections-svg" id="agent-connections-svg" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true">
-                    <path id="path-core-risk" class="connection-line" :class="{ active: isFlowPathActive('core-risk') }" d="M 500 92 C 500 115 150 105 150 130" />
+                  <svg class="agent-connections-svg" id="agent-connections-svg" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
+                    <path id="path-core-risk" class="connection-line" :class="{ active: isFlowPathActive('core-risk') }" d="M 500 132 C 500 165 190 165 190 190" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('core-risk') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-core-risk" /></animateMotion>
                     </circle>
-                    <path id="path-core-macro" class="connection-line" :class="{ active: isFlowPathActive('core-macro') }" d="M 500 92 C 500 115 380 105 380 130" />
+                    <path id="path-core-macro" class="connection-line" :class="{ active: isFlowPathActive('core-macro') }" d="M 500 132 C 500 165 395 165 395 190" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('core-macro') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-core-macro" /></animateMotion>
                     </circle>
-                    <path id="path-core-cost" class="connection-line" :class="{ active: isFlowPathActive('core-cost') }" d="M 500 92 C 500 115 620 105 620 130" />
+                    <path id="path-core-cost" class="connection-line" :class="{ active: isFlowPathActive('core-cost') }" d="M 500 132 C 500 165 605 165 605 190" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('core-cost') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-core-cost" /></animateMotion>
                     </circle>
-                    <path id="path-core-news" class="connection-line" :class="{ active: isFlowPathActive('core-news') }" d="M 500 92 C 500 115 850 105 850 130" />
+                    <path id="path-core-news" class="connection-line" :class="{ active: isFlowPathActive('core-news') }" d="M 500 132 C 500 165 810 165 810 190" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('core-news') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-core-news" /></animateMotion>
                     </circle>
 
-                    <path id="path-risk-med" class="connection-line" :class="{ active: isFlowPathActive('risk-med') }" d="M 150 224 C 150 260 500 225 500 260" />
+                    <path id="path-risk-med" class="connection-line" :class="{ active: isFlowPathActive('risk-med') }" d="M 190 330 C 190 370 500 345 500 380" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('risk-med') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-risk-med" /></animateMotion>
                     </circle>
-                    <path id="path-macro-med" class="connection-line" :class="{ active: isFlowPathActive('macro-med') }" d="M 380 224 C 380 250 500 240 500 260" />
+                    <path id="path-macro-med" class="connection-line" :class="{ active: isFlowPathActive('macro-med') }" d="M 395 330 C 395 360 500 360 500 380" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('macro-med') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-macro-med" /></animateMotion>
                     </circle>
-                    <path id="path-cost-med" class="connection-line" :class="{ active: isFlowPathActive('cost-med') }" d="M 620 224 C 620 250 500 240 500 260" />
+                    <path id="path-cost-med" class="connection-line" :class="{ active: isFlowPathActive('cost-med') }" d="M 605 330 C 605 360 500 360 500 380" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('cost-med') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-cost-med" /></animateMotion>
                     </circle>
-                    <path id="path-news-med" class="connection-line" :class="{ active: isFlowPathActive('news-med') }" d="M 850 224 C 850 260 500 225 500 260" />
+                    <path id="path-news-med" class="connection-line" :class="{ active: isFlowPathActive('news-med') }" d="M 810 330 C 810 370 500 345 500 380" />
                     <circle r="4.5" fill="var(--color-accent, #ef4444)" :class="isFlowPathActive('news-med') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#path-news-med" /></animateMotion>
                     </circle>
 
-                    <path id="path-med-judge" class="connection-line" :class="{ active: isFlowPathActive('med-judge') }" d="M 500 352 C 500 372 500 372 500 390" />
+                    <path id="path-med-judge" class="connection-line" :class="{ active: isFlowPathActive('med-judge') }" d="M 500 506 C 500 522 500 522 500 535" />
                     <circle r="4.5" fill="var(--color-primary, #f47521)" :class="isFlowPathActive('med-judge') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.2s" repeatCount="indefinite"><mpath href="#path-med-judge" /></animateMotion>
                     </circle>
-                    <path id="path-judge-lightning" class="connection-line" :class="{ active: isFlowPathActive('judge-lightning') }" d="M 500 482 C 500 500 500 500 500 520" />
+                    <path id="path-judge-lightning" class="connection-line" :class="{ active: isFlowPathActive('judge-lightning') }" d="M 500 655 C 500 674 500 674 500 690" />
                     <circle r="4.5" fill="var(--color-primary, #f47521)" :class="isFlowPathActive('judge-lightning') ? 'signal-pulse' : 'signal-pulse-hidden'">
                       <animateMotion dur="1.2s" repeatCount="indefinite"><mpath href="#path-judge-lightning" /></animateMotion>
                     </circle>
