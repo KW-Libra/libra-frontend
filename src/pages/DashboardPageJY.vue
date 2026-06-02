@@ -21,12 +21,20 @@ type Level = 0 | 1 | 2 | 3 | 4
 type Tone = 'positive' | 'danger' | 'neutral'
 type DashboardTab = 'dashboard' | 'agent' | 'risk' | 'mypage'
 type AgentSubtab = 'settings' | 'visualize' | 'history'
-type AgentViewState = 'init' | 'running' | 'success' | 'deadlock'
+type AgentViewState = 'init' | 'running' | 'success' | 'manualReview' | 'deadlock'
 type FlowNodeKey = 'core' | 'risk' | 'macro' | 'cost' | 'news' | 'mediator' | 'judge'
 type StrategicModeKey = 'conservative' | 'balanced' | 'aggressive'
 type VoteDirection = 'INCREASE' | 'HOLD' | 'DECREASE'
 type AssetClassKey = 'EQUITY' | 'BOND' | 'ALT' | 'CASH'
+type ManualReviewDecision = 'APPROVE' | 'REJECT' | 'REVISE'
 type AgentCompletedRunEvent = Extract<RunEvent, { event: 'agent_completed' }>
+
+interface ManualReviewAction {
+  decision: ManualReviewDecision
+  label: string
+  approved: boolean
+  className: string
+}
 
 interface PortfolioHoldingCard {
   key: string
@@ -307,7 +315,8 @@ const committeeState = computed(() => {
 const agentViewState = computed<AgentViewState>(() => {
   if (runStream.isStreaming) return 'running'
   if (runStream.phase === 'completed') return 'success'
-  if (runStream.phase === 'failed' || runStream.phase === 'interrupted') return 'deadlock'
+  if (runStream.phase === 'interrupted') return 'manualReview'
+  if (runStream.phase === 'failed') return 'deadlock'
   return 'init'
 })
 
@@ -340,6 +349,40 @@ const latestFinalDecision = computed(() => {
     }
   }
   return null
+})
+const isManualReview = computed(() => runStream.phase === 'interrupted' && !!runStream.pendingInterrupt)
+const manualReviewSummary = computed(() => {
+  const pending = runStream.pendingInterrupt
+  return (
+    pending?.message ||
+    latestFinalDecision.value?.summary ||
+    '최종 결정 적용 전에 사용자 확인이 필요합니다.'
+  )
+})
+const manualReviewDecisionLabel = computed(() => {
+  const pending = runStream.pendingInterrupt
+  return pending?.decision || latestFinalDecision.value?.decision || 'USER_DECISION_REQUIRED'
+})
+const manualReviewActions = computed<ManualReviewAction[]>(() => {
+  const fallback: ManualReviewAction[] = [
+    { decision: 'APPROVE', label: 'Approve Decision', approved: true, className: 'approve-btn' },
+    { decision: 'REJECT', label: 'Reject Decision', approved: false, className: 'reject-btn' },
+    { decision: 'REVISE', label: 'Request Revision', approved: false, className: 'revise-btn' }
+  ]
+  const options = runStream.pendingInterrupt?.options
+  if (!options?.length) return fallback
+  return options
+    .map((option, index) => {
+      const decision = String(option.decision || '').toUpperCase()
+      const base = fallback.find((item) => item.decision === decision)
+      if (!base) return null
+      return {
+        ...base,
+        label: option.label || base.label,
+        className: `${base.className} option-${index}`
+      }
+    })
+    .filter((item): item is ManualReviewAction => !!item)
 })
 const councilFlowState = computed(() => {
   const state = {
@@ -1254,7 +1297,7 @@ async function startAgentRun() {
       trigger: 'pull',
       depth: 'deep',
       deadline_seconds: 900,
-      approval_required: false,
+      approval_required: true,
       enable_human_interrupts: true,
       portfolio: currentPortfolioPayload(),
       governance_v1: currentGovernancePayload(),
@@ -1461,6 +1504,29 @@ function resetAgentSession() {
   runStream.reset()
   pageNotice.value = '에이전트 세션을 초기화했습니다.'
   pageError.value = ''
+}
+
+async function resumeManualReview(action: ManualReviewAction) {
+  const pending = runStream.pendingInterrupt
+  pageNotice.value = ''
+  pageError.value = ''
+  try {
+    await runStream.resume({
+      approved: action.approved,
+      decision: action.decision,
+      interrupt_id: pending?.interrupt_id ?? null,
+      option_index: Math.max(0, manualReviewActions.value.findIndex((item) => item.decision === action.decision)),
+      override_decision: action.decision === 'APPROVE' ? manualReviewDecisionLabel.value : undefined,
+      note: `dashboard-jy:${action.decision}`,
+      metadata: {
+        source: 'dashboard_jy',
+        strategic_mode: selectedStrategicMode.value
+      }
+    })
+    pageNotice.value = `${action.label} 응답을 에이전트에 전달했습니다.`
+  } catch (err) {
+    pageError.value = `에이전트 실행을 재개하지 못했습니다: ${errorMessage(err)}`
+  }
 }
 
 function exportAgentLog() {
@@ -3043,7 +3109,11 @@ function errorMessage(err: unknown): string {
             </div>
           </div>
 
-          <div id="agent-view-deadlock" class="agent-vis-layout" :class="{ hidden: agentViewState !== 'deadlock' }">
+          <div
+            id="agent-view-deadlock"
+            class="agent-vis-layout"
+            :class="{ hidden: agentViewState !== 'deadlock' && agentViewState !== 'manualReview', 'manual-review-mode': isManualReview }"
+          >
             <div class="agent-flow-column">
               <div class="agent-vis-card deadlock-board">
                 <div class="deadlock-hud-top">
@@ -3053,13 +3123,13 @@ function errorMessage(err: unknown): string {
                     <span class="hud-logo-text">a.Rebalance</span>
                   </div>
                   <div class="hud-top-right">
-                    <span class="hud-badge-gray">system diagnostics</span>
-                    <span class="hud-badge-red">halted</span>
+                    <span class="hud-badge-gray">{{ isManualReview ? 'review queue' : 'system diagnostics' }}</span>
+                    <span class="hud-badge-red">{{ isManualReview ? 'waiting' : 'halted' }}</span>
                   </div>
                 </div>
                 <div class="deadlock-title-group">
-                  <h2>Consensus Deadlock.</h2>
-                  <p class="deadlock-subtitle">{{ agentFailureSummary }}</p>
+                  <h2>{{ isManualReview ? 'Manual Review Required.' : 'Consensus Deadlock.' }}</h2>
+                  <p class="deadlock-subtitle">{{ isManualReview ? manualReviewSummary : agentFailureSummary }}</p>
                 </div>
                 <div class="agent-flow-canvas deadlock-canvas">
                   <svg class="agent-connections-svg deadlock-svg" viewBox="0 0 1000 520" preserveAspectRatio="none" aria-hidden="true">
@@ -3072,7 +3142,7 @@ function errorMessage(err: unknown): string {
                     <div class="flow-node-card node-top status-deadlock">
                       <div class="node-glow-bg red-glow"></div>
                       <i class="ph-bold ph-briefcase node-icon"></i>
-                      <div class="node-info"><h4>CORE COUNCIL</h4><span class="node-status-text red-txt">TIMEOUT</span></div>
+                      <div class="node-info"><h4>CORE COUNCIL</h4><span class="node-status-text red-txt">{{ isManualReview ? 'WAITING' : 'TIMEOUT' }}</span></div>
                     </div>
                     <div class="flow-node-card status-deadlock" style="top: 185px; left: 10%;">
                       <div class="node-glow-bg red-glow"></div>
@@ -3087,23 +3157,23 @@ function errorMessage(err: unknown): string {
                     <div class="flow-node-card node-bottom-1 status-deadlock-mediator" style="top: 330px;">
                       <div class="node-glow-bg red-glow"></div>
                       <i class="ph-bold ph-scales node-icon mediator"></i>
-                      <div class="node-info"><h4>MEDIATOR JUDGE</h4><span class="node-status-text red-txt">HALTED</span></div>
+                      <div class="node-info"><h4>MEDIATOR JUDGE</h4><span class="node-status-text red-txt">{{ isManualReview ? 'PENDING' : 'HALTED' }}</span></div>
                     </div>
                   </div>
                 </div>
                 <div class="agent-flow-status-bar deadlock-status-bar">
-                  <div class="status-phase"><span class="status-label red-txt">CURRENT STATUS</span><h3 class="red-txt">Awaiting Manual Override</h3></div>
-                  <div class="status-time"><span class="status-label red-txt">HALTED SINCE</span><h3 class="red-txt">{{ agentSessionTimeLabel }}</h3></div>
+                  <div class="status-phase"><span class="status-label red-txt">CURRENT STATUS</span><h3 class="red-txt">{{ isManualReview ? 'Awaiting User Decision' : 'Awaiting Manual Override' }}</h3></div>
+                  <div class="status-time"><span class="status-label red-txt">{{ isManualReview ? 'WAITING SINCE' : 'HALTED SINCE' }}</span><h3 class="red-txt">{{ agentSessionTimeLabel }}</h3></div>
                 </div>
               </div>
             </div>
             <div class="agent-console-column">
               <div class="console-card conflict-alert-card">
-                <div class="conflict-alert-header"><i class="ph-bold ph-warning-circle"></i><span>CONFLICT 042-B</span></div>
-                <p>{{ agentFailureSummary }}</p>
+                <div class="conflict-alert-header"><i class="ph-bold ph-warning-circle"></i><span>{{ isManualReview ? 'REVIEW REQUIRED' : 'CONFLICT 042-B' }}</span></div>
+                <p>{{ isManualReview ? manualReviewDecisionLabel : agentFailureSummary }}</p>
               </div>
               <div class="console-card conflict-points-card">
-                <div class="card-header-simple"><h3>CONFLICT POINTS</h3></div>
+                <div class="card-header-simple"><h3>{{ isManualReview ? 'DECISION CONTEXT' : 'CONFLICT POINTS' }}</h3></div>
                 <div class="conflict-points-list">
                   <div v-for="row in agentFailurePoints" :key="row.key" class="conflict-point-row">
                     <strong class="point-title">{{ row.sender }}</strong>
@@ -3111,7 +3181,21 @@ function errorMessage(err: unknown): string {
                   </div>
                 </div>
               </div>
-              <div class="deadlock-actions-area">
+              <div v-if="isManualReview" class="deadlock-actions-area manual-review-actions">
+                <button
+                  v-for="action in manualReviewActions"
+                  :key="action.decision"
+                  type="button"
+                  class="btn-deadlock-action"
+                  :class="action.className"
+                  :disabled="runStream.isStreaming"
+                  @click="resumeManualReview(action)"
+                >
+                  {{ action.label }}
+                </button>
+                <button type="button" class="btn-deadlock-action restart-btn" :disabled="runStream.isStreaming" @click="resetAgentSession">Reset Session</button>
+              </div>
+              <div v-else class="deadlock-actions-area">
                 <button type="button" class="btn-deadlock-action override-btn" @click="resetAgentSession">Reset Session</button>
                 <button type="button" class="btn-deadlock-action restart-btn" @click="startAgentRun">Restart Analysis</button>
               </div>

@@ -2241,6 +2241,30 @@
   background: rgba(239, 68, 68, 0.08);
 }
 
+.manual-review-mode .flow-node-card.status-deadlock,
+.manual-review-mode .flow-node-card.status-deadlock-mediator {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.04);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.18);
+}
+
+.dark-theme .manual-review-mode .flow-node-card.status-deadlock,
+.dark-theme .manual-review-mode .flow-node-card.status-deadlock-mediator {
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.manual-review-mode .connection-line {
+  stroke: #f59e0b;
+}
+
+.manual-review-mode .red-glow {
+  background: #f59e0b;
+}
+
+.manual-review-mode .red-txt {
+  color: #f59e0b !important;
+}
+
 .red-glow {
   background: #ef4444;
   opacity: 0.08 !important;
@@ -2280,6 +2304,15 @@
   color: #cbd5e0;
 }
 
+.manual-review-mode .conflict-alert-card {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.manual-review-mode .conflict-alert-header {
+  color: #f59e0b;
+}
+
 /* Conflict Points */
 .conflict-points-card {
   padding: 20px;
@@ -2306,6 +2339,10 @@
   width: 3px;
   background-color: #ef4444;
   border-radius: 1.5px;
+}
+
+.manual-review-mode .conflict-point-row::before {
+  background-color: #f59e0b;
 }
 
 .point-title {
@@ -2361,6 +2398,44 @@
   transform: translateY(-1px);
 }
 
+.btn-deadlock-action.approve-btn {
+  background: #10b981;
+  color: #fff;
+  border: none;
+}
+
+.btn-deadlock-action.approve-btn:hover {
+  background: #059669;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-deadlock-action.reject-btn,
+.btn-deadlock-action.revise-btn {
+  background: transparent;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #d97706;
+}
+
+.dark-theme .btn-deadlock-action.reject-btn,
+.dark-theme .btn-deadlock-action.revise-btn {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.btn-deadlock-action.reject-btn:hover,
+.btn-deadlock-action.revise-btn:hover {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+}
+
+.btn-deadlock-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 .btn-deadlock-action.restart-btn {
   background: transparent;
   border: 1px solid #cbd5e0;
@@ -2382,6 +2457,83 @@
   background: rgba(255, 255, 255, 0.04);
   color: #fff;
   border-color: #cbd5e0;
+}
+
+@media (max-width: 1420px) {
+  #agent-view-deadlock.agent-vis-layout {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+  }
+
+  #agent-view-deadlock .agent-flow-column,
+  #agent-view-deadlock .agent-console-column {
+    height: auto;
+    min-width: 0;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 860px) {
+  #agent-view-deadlock .agent-vis-card.deadlock-board {
+    padding: 24px 20px 24px;
+    border-radius: 22px;
+  }
+
+  #agent-view-deadlock .deadlock-title-group h2 {
+    font-size: clamp(30px, 8.4vw, 36px);
+    line-height: 1.08;
+  }
+
+  #agent-view-deadlock .deadlock-canvas {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+    background: transparent;
+    border: 0;
+  }
+
+  #agent-view-deadlock .agent-connections-svg {
+    display: none;
+  }
+
+  #agent-view-deadlock .agent-nodes-layer {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: auto;
+  }
+
+  #agent-view-deadlock .flow-node-card,
+  #agent-view-deadlock .node-top,
+  #agent-view-deadlock .node-bottom-1 {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    min-height: 0;
+  }
+
+  #agent-view-deadlock .agent-flow-status-bar {
+    border-radius: 20px;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  #agent-view-deadlock .agent-console-column,
+  #agent-view-deadlock .deadlock-actions-area {
+    width: 100%;
+  }
+
+  #agent-view-deadlock .btn-deadlock-action {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 /* ==========================================================================
