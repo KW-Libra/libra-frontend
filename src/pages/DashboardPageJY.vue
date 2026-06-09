@@ -500,6 +500,23 @@ const agentTranscriptRows = computed(() => {
     }
   })
   if (rows.length) return rows
+  if (runStream.isStreaming) {
+    return [
+      {
+        key: 'preparing',
+        sender: '코어 시스템',
+        role: runStream.isPreparing ? '수집 중' : '분석 중',
+        flow: 'core' as FlowNodeKey,
+        flowLabel: 'CORE NODE',
+        time: formatTime(new Date().toISOString()),
+        text: runStream.isPreparing
+          ? '시장 데이터와 공시·뉴스·리포트를 수집하고 있습니다. 잠시만 기다려 주세요.'
+          : '에이전트들이 포트폴리오를 분석하고 있습니다.',
+        avatar: 'dark',
+        speaking: true
+      }
+    ]
+  }
   return [
     { key: 'seed-core', sender: '코어 시스템', role: '대기', flow: 'core' as FlowNodeKey, flowLabel: 'CORE NODE', time: formatTime(new Date().toISOString()), text: '포트폴리오 점검을 시작할 준비가 되어 있습니다.', avatar: 'dark', speaking: false },
     { key: 'seed-risk', sender: '리스크 에이전트', role: '준비 완료', flow: 'risk' as FlowNodeKey, flowLabel: 'RISK NODE', time: formatTime(new Date().toISOString()), text: '실행하면 보유 종목, 가격 흐름, 공시·뉴스·리포트, 거래비용을 차례로 확인합니다.', avatar: 'yellow', speaking: false }
@@ -1091,6 +1108,15 @@ const logRows = computed(() => {
     tone: audit.status === 'SUBMITTED' ? 'positive' as Tone : audit.status === 'FAILED' || audit.status === 'REJECTED' ? 'danger' as Tone : 'neutral' as Tone
   }))
   if (!streamRows.length && !auditRows.length) {
+    if (runStream.isStreaming) {
+      return [{
+        key: 'collecting',
+        time: formatTime(new Date().toISOString()),
+        label: runStream.isPreparing ? 'COLLECTING_MARKET_DATA' : 'AGENTS_DELIBERATING',
+        detail: runStream.isPreparing ? '시장 데이터·뉴스·공시 수집 중' : '에이전트 심의 중',
+        tone: 'neutral' as Tone
+      }]
+    }
     const events = [
       'RISK_EVAL_PASS [0x37BA]',
       'PORTFOLIO_SYNC_OK [0x11A4]',

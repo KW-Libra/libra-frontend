@@ -2,6 +2,7 @@
 // Keep this aligned with libra-agent/docs/run-events.md.
 
 export type RunEventName =
+  | 'run_preparing'
   | 'run_started'
   | 'node_started'
   | 'node_completed'
@@ -135,6 +136,13 @@ export interface JudgeActionPayload {
 }
 
 export type RunEvent =
+  | {
+      event: 'run_preparing'
+      data: {
+        phase: string
+        message: string
+      }
+    }
   | {
       event: 'run_started'
       data: {

@@ -14,6 +14,7 @@ type InterruptRequiredEvent = Extract<RunEvent, { event: 'interrupt_required' }>
 export type RunStreamPhase =
   | 'idle'
   | 'connecting'
+  | 'preparing'
   | 'streaming'
   | 'interrupted'
   | 'completed'
@@ -48,7 +49,8 @@ export const useRunStreamStore = defineStore('runStream', () => {
       ].includes(event.event)
     )
   )
-  const isStreaming = computed(() => phase.value === 'connecting' || phase.value === 'streaming')
+  const isStreaming = computed(() => phase.value === 'connecting' || phase.value === 'preparing' || phase.value === 'streaming')
+  const isPreparing = computed(() => phase.value === 'preparing')
   const isAwaitingResume = computed(() => phase.value === 'interrupted' && !!pendingInterrupt.value)
   const hasTerminalEvent = computed(() =>
     phase.value === 'interrupted' ||
@@ -92,6 +94,13 @@ export const useRunStreamStore = defineStore('runStream', () => {
   }
 
   function applyEvent(event: RunEvent) {
+    if (event.event === 'run_preparing') {
+      // 준비(데이터 수집) 단계 — 타임라인에는 쌓지 않고 상태만 바꾼다.
+      if (phase.value === 'connecting' || phase.value === 'streaming') {
+        phase.value = 'preparing'
+      }
+      return
+    }
     events.value.push(event)
 
     switch (event.event) {
@@ -223,6 +232,7 @@ export const useRunStreamStore = defineStore('runStream', () => {
     timelineEvents,
     debateEvents,
     isStreaming,
+    isPreparing,
     isAwaitingResume,
     hasTerminalEvent,
     start,
