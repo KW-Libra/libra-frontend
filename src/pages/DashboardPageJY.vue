@@ -6,6 +6,7 @@ import { brokerApi } from '@/api/broker'
 import type { RunStartBody } from '@/api/sse'
 import { useAuthStore } from '@/stores/auth'
 import { useRunStreamStore } from '@/stores/runStream'
+import { useAgentHistory } from '@/composables/useAgentHistory'
 import type {
   DecimalValue,
   KisBalance,
@@ -211,6 +212,12 @@ const DEMO_AGENT_OPINIONS: Array<{
 const router = useRouter()
 const auth = useAuthStore()
 const runStream = useRunStreamStore()
+const {
+  runs: historyRuns,
+  selected: historySelected,
+  loadRuns: loadHistoryRuns,
+  selectRun: selectHistoryRun
+} = useAgentHistory()
 
 const status = ref<KisStatus | null>(null)
 const balance = ref<KisBalance | null>(null)
@@ -521,6 +528,40 @@ const agentTranscriptRows = computed(() => {
     { key: 'seed-core', sender: '코어 시스템', role: '대기', flow: 'core' as FlowNodeKey, flowLabel: 'CORE NODE', time: formatTime(new Date().toISOString()), text: '포트폴리오 점검을 시작할 준비가 되어 있습니다.', avatar: 'dark', speaking: false },
     { key: 'seed-risk', sender: '리스크 에이전트', role: '준비 완료', flow: 'risk' as FlowNodeKey, flowLabel: 'RISK NODE', time: formatTime(new Date().toISOString()), text: '실행하면 보유 종목, 가격 흐름, 공시·뉴스·리포트, 거래비용을 차례로 확인합니다.', avatar: 'yellow', speaking: false }
   ]
+})
+
+const historySessionCards = computed(() =>
+  historyRuns.value.map((run) => ({
+    id: run.id,
+    date: formatTime(run.createdAt),
+    statusLabel: run.status,
+    statusClass: run.status === 'FAILED' ? 'aborted' : run.status === 'COMPLETED' ? 'executed' : 'streaming',
+    title: run.finalDecision || (run.status === 'RUNNING' ? '진행 중' : '심의 세션'),
+    detail: `${run.eventCount} events`
+  }))
+)
+
+const historyTranscriptRows = computed(() => {
+  const transcript = historySelected.value
+  if (!transcript) return []
+  const skip = new Set(['run_preparing', 'node_started', 'node_completed'])
+  return transcript.events
+    .filter((event) => !skip.has(event.eventType))
+    .map((event) => {
+      const ev = { event: event.eventType, data: (event.data ?? undefined) as Record<string, unknown> | undefined }
+      const flow = eventFlowNode(ev)
+      return {
+        key: `hist-${event.eventIndex}`,
+        sender: transcriptSender(ev),
+        role: userEventLabel(ev),
+        flow,
+        flowLabel: flowNodeLabel(flow),
+        time: formatTime(event.createdAt),
+        text: eventDetail(ev),
+        avatar: transcriptAvatar(ev),
+        speaking: false
+      }
+    })
 })
 
 watch(
@@ -1462,6 +1503,9 @@ function openDraftOrders() {
 
 function setAgentSubtab(tab: AgentSubtab) {
   activeAgentSubtab.value = tab
+  if (tab === 'history') {
+    void loadHistoryRuns()
+  }
 }
 
 function selectDashboardSubject(subject: string, targetSubtab: AgentSubtab = 'history') {
@@ -3264,16 +3308,17 @@ function errorMessage(err: unknown): string {
                       <div class="hsc-metric"><span class="hsc-metric-lbl">CONSENSUS</span><strong class="hsc-metric-val green">TRACE</strong></div>
                     </div>
                   </button>
-                  <button v-for="row in logRows.slice(0, 3)" :key="row.key" type="button" class="history-session-card" @click="setAgentSubtab('visualize')">
+                  <button v-for="card in historySessionCards" :key="card.id" type="button" class="history-session-card" :class="{ active: historySelected?.run?.id === card.id }" @click="selectHistoryRun(card.id)">
                     <div class="hsc-top">
-                      <span class="hsc-date">{{ row.time }}</span>
-                      <span class="hsc-status" :class="row.tone === 'danger' ? 'aborted' : 'executed'">{{ row.tone.toUpperCase() }}</span>
+                      <span class="hsc-date">{{ card.date }}</span>
+                      <span class="hsc-status" :class="card.statusClass">{{ card.statusLabel }}</span>
                     </div>
-                    <h3 class="hsc-title">{{ row.label }}</h3>
+                    <h3 class="hsc-title">{{ card.title }}</h3>
                     <div class="hsc-metrics">
-                      <div class="hsc-metric"><span class="hsc-metric-lbl">DETAIL</span><strong class="hsc-metric-val">{{ row.detail || 'runtime' }}</strong></div>
+                      <div class="hsc-metric"><span class="hsc-metric-lbl">DETAIL</span><strong class="hsc-metric-val">{{ card.detail }}</strong></div>
                     </div>
                   </button>
+                  <p v-if="!historySessionCards.length" class="history-empty-hint">아직 저장된 심의 세션이 없습니다. 리밸런싱 판단을 실행하면 여기에 기록됩니다.</p>
                 </div>
               </div>
 
@@ -3291,7 +3336,7 @@ function errorMessage(err: unknown): string {
                 </div>
 
                 <div class="history-transcript-feed">
-                  <div v-for="row in agentTranscriptRows" :key="row.key" class="ht-entry">
+                  <div v-for="row in (historySelected ? historyTranscriptRows : agentTranscriptRows)" :key="row.key" class="ht-entry">
                     <div class="ht-avatar" :class="row.avatar"><i class="ph-bold ph-robot"></i></div>
                     <div class="ht-body">
                       <div class="ht-meta">
