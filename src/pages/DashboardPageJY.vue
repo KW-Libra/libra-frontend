@@ -3500,7 +3500,8 @@ function errorMessage(err: unknown): string {
 
 .jy-dashboard-host {
   min-height: 100vh;
-  background: #141517;
+  background: var(--color-bg);
+  color: var(--color-text-main);
 }
 
 .jy-dashboard-host #dashboard-page.view-section {
@@ -3537,7 +3538,6 @@ function errorMessage(err: unknown): string {
 }
 
 .jy-dashboard-host .notch-link,
-.jy-dashboard-host .notch-lang-toggle,
 .jy-dashboard-host .notch-actions {
   flex: 0 0 auto;
 }
@@ -3548,7 +3548,7 @@ function errorMessage(err: unknown): string {
   gap: 4px;
   margin-left: 10px;
   padding-left: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--color-border);
 }
 
 .jy-dashboard-host .notch-action-btn {
@@ -3558,7 +3558,7 @@ function errorMessage(err: unknown): string {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--color-text-sub);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3567,23 +3567,8 @@ function errorMessage(err: unknown): string {
 }
 
 .jy-dashboard-host .notch-action-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-}
-
-.jy-dashboard-host .notch-notif-dot {
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  min-width: 15px;
-  height: 15px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  color: #111318;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 15px;
+  background: var(--color-primary-soft);
+  color: var(--color-text-main);
 }
 
 .jy-dashboard-host .zone-dark.dashboard-zone-compact {
@@ -3599,7 +3584,7 @@ function errorMessage(err: unknown): string {
     radial-gradient(115% 75% at 50% -12%, rgba(124, 92, 252, 0.13) 0%, transparent 55%),
     radial-gradient(70% 55% at 88% 112%, rgba(124, 92, 252, 0.10) 0%, transparent 52%),
     radial-gradient(65% 55% at 6% 108%, rgba(70, 90, 180, 0.08) 0%, transparent 50%),
-    #08080c;
+    var(--color-bg);
 }
 
 .jy-dashboard-host.dashboard-tab-active .zone-light {
@@ -3624,13 +3609,13 @@ function errorMessage(err: unknown): string {
   --td-green: #22c55e;
   --td-red: #ef4444;
   --td-gold: #f59e0b;
-  --td-card-bg: rgba(255, 255, 255, 0.018);
-  --td-card-border: rgba(255, 255, 255, 0.07);
-  --td-card-border-hover: rgba(255, 255, 255, 0.14);
-  --td-label: rgba(255, 255, 255, 0.42);
-  --td-text: rgba(255, 255, 255, 0.92);
-  --td-text-dim: rgba(255, 255, 255, 0.6);
-  --td-track: rgba(255, 255, 255, 0.07);
+  --td-card-bg: var(--color-card);
+  --td-card-border: var(--color-border);
+  --td-card-border-hover: var(--color-border-hover);
+  --td-label: var(--color-text-light);
+  --td-text: var(--color-text-main);
+  --td-text-dim: var(--color-text-sub);
+  --td-track: var(--color-border);
   width: 100%;
   max-width: 1680px;
   margin: 0 auto;
