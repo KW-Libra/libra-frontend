@@ -4554,6 +4554,20 @@ function errorMessage(err: unknown): string {
   padding: 0 12px;
 }
 
+/* 라이트 모드 가시성 — KIS 자격증명 폼 */
+.jy-dashboard-host:not(.dark-theme) .credential-grid label {
+  color: rgba(20, 22, 28, 0.72);
+}
+.jy-dashboard-host:not(.dark-theme) .credential-grid input,
+.jy-dashboard-host:not(.dark-theme) .credential-grid select {
+  border-color: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.03);
+  color: #16181d;
+}
+.jy-dashboard-host:not(.dark-theme) .credential-grid input::placeholder {
+  color: rgba(0, 0, 0, 0.4);
+}
+
 .jy-dashboard-host .checkline {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
