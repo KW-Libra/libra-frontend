@@ -231,7 +231,6 @@ const activeTab = ref<DashboardTab>('dashboard')
 const activeAgentSubtab = ref<AgentSubtab>('visualize')
 const showAgentConsole = ref(false)
 const transcriptFeedEl = ref<HTMLElement | null>(null)
-const activeLanguage = ref<'KO' | 'EN'>('KO')
 const isDarkTheme = ref(true)
 const selectedStrategicMode = ref<StrategicModeKey>('balanced')
 const riskScore = ref(5.5)
@@ -1496,11 +1495,6 @@ function setTerminalAssetNav(nav: 'main' | 'equities' | 'fixed' | 'crypto' | 'ca
   terminalCenterView.value = nav === 'calendar' ? 'calendar' : 'overview'
 }
 
-function openDraftOrders() {
-  pageError.value = ''
-  pageNotice.value = 'Draft Orders는 다음 체결 후보를 생성하기 전 검토 대기 상태입니다.'
-}
-
 function setAgentSubtab(tab: AgentSubtab) {
   activeAgentSubtab.value = tab
   if (tab === 'history') {
@@ -1517,12 +1511,6 @@ function selectDashboardSubject(subject: string, targetSubtab: AgentSubtab = 'hi
 
 function clearDashboardSubject() {
   selectedDashboardSubject.value = null
-}
-
-function setLanguage(language: 'KO' | 'EN') {
-  activeLanguage.value = language
-  pageNotice.value = language === 'KO' ? '한국어 화면으로 표시합니다.' : 'English UI preview is selected.'
-  pageError.value = ''
 }
 
 function isStrategicModeKey(value: string | null): value is StrategicModeKey {
@@ -1600,18 +1588,32 @@ async function resumeManualReview(action: ManualReviewAction) {
 }
 
 function exportAgentLog() {
-  const payload = {
-    exported_at: new Date().toISOString(),
-    phase: runStream.phase,
-    thread_id: runStream.currentThreadId,
-    events: runStream.timelineEvents,
-    visible_events: visibleTimelineEvents.value.map((event) => ({
-      time: eventTime(event),
-      actor: transcriptSender(event),
-      label: userEventLabel(event),
-      detail: eventDetail(event),
-    })),
+  const hist = historySelected.value
+  if (!hist && !runStream.timelineEvents.length) {
+    pageError.value = ''
+    pageNotice.value = '내보낼 심의 로그가 없습니다. 분석을 실행하거나 이력에서 세션을 선택하세요.'
+    return
   }
+  const payload = hist
+    ? {
+        exported_at: new Date().toISOString(),
+        source: 'history',
+        run: hist.run,
+        events: hist.events,
+      }
+    : {
+        exported_at: new Date().toISOString(),
+        source: 'live',
+        phase: runStream.phase,
+        thread_id: runStream.currentThreadId,
+        events: runStream.timelineEvents,
+        visible_events: visibleTimelineEvents.value.map((event) => ({
+          time: eventTime(event),
+          actor: transcriptSender(event),
+          label: userEventLabel(event),
+          detail: eventDetail(event),
+        })),
+      }
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
@@ -2315,15 +2317,7 @@ function errorMessage(err: unknown): string {
           <i class="ph ph-user"></i><span>마이 페이지</span>
         </button>
       </div>
-      <div class="notch-lang-toggle" role="group" aria-label="Language">
-        <button type="button" class="notch-lang-btn" :class="{ active: activeLanguage === 'KO' }" @click="setLanguage('KO')">KO</button>
-        <button type="button" class="notch-lang-btn" :class="{ active: activeLanguage === 'EN' }" @click="setLanguage('EN')">EN</button>
-      </div>
       <div class="notch-actions">
-        <button type="button" class="notch-action-btn" aria-label="알림">
-          <i class="ph ph-bell"></i>
-          <span class="notch-notif-dot">1</span>
-        </button>
         <button type="button" class="notch-action-btn" title="테마 전환" aria-label="테마 전환" @click="toggleTheme">
           <i class="ph" :class="isDarkTheme ? 'ph-moon' : 'ph-sun'"></i>
         </button>
@@ -2387,13 +2381,6 @@ function errorMessage(err: unknown): string {
               </button>
               <button class="td-navitem" :class="{ active: terminalAssetNav === 'calendar' }" type="button" @click="setTerminalAssetNav('calendar')">
                 <i class="ph ph-calendar-blank"></i><span>Calendar</span>
-              </button>
-            </nav>
-
-            <nav class="td-navgroup">
-              <span class="td-navgroup-label">FORGE</span>
-              <button class="td-navitem" type="button" @click="openDraftOrders">
-                <i class="ph ph-scroll"></i><span>Draft Orders</span>
               </button>
             </nav>
 
