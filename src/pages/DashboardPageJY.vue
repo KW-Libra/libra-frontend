@@ -1447,6 +1447,7 @@ function currentGovernancePayload(): Record<string, unknown> {
   const mode = selectedStrategicModeConfig.value
   return {
     enabled: true,
+    execution_mode: 'primary',
     source: 'dashboard_strategy_mode',
     strategy_mode: mode.value,
     kyc: {
