@@ -356,6 +356,8 @@ const latestFinalDecision = computed(() => {
   }
   return null
 })
+const finalDecisionLabel = computed(() => (latestFinalDecision.value?.decision || '').toUpperCase())
+const isNoTradeDecision = computed(() => finalDecisionLabel.value !== 'REBALANCE')
 const isManualReview = computed(() => runStream.phase === 'interrupted' && !!runStream.pendingInterrupt)
 const manualReviewSummary = computed(() => {
   const pending = runStream.pendingInterrupt
@@ -3075,9 +3077,9 @@ function errorMessage(err: unknown): string {
               <div class="agent-vis-card success-board">
                 <div class="agent-vis-header">
                   <div class="header-title-area">
-                    <span class="vis-badge green"><i class="ph ph-shield-check"></i> system resolved</span>
-                    <h2>Rebalance Resolved.</h2>
-                    <p>The committee finished the live analysis and produced an executable decision trace.</p>
+                    <span class="vis-badge green"><i class="ph ph-shield-check"></i> {{ isNoTradeDecision ? '유지 권고' : 'system resolved' }}</span>
+                    <h2>{{ isNoTradeDecision ? '유지 권고.' : 'Rebalance Resolved.' }}</h2>
+                    <p>{{ isNoTradeDecision ? '위원회 심의 결과 현재 포트폴리오를 유지합니다 — 즉시 실행할 거래는 없습니다.' : 'The committee finished the live analysis and produced an executable decision trace.' }}</p>
                   </div>
                   <div class="header-actions-area">
                     <button type="button" class="dropdown-mock" @click="setAgentSubtab('settings')">portfolio settings <i class="ph ph-caret-down"></i></button>
@@ -3093,21 +3095,22 @@ function errorMessage(err: unknown): string {
 
                 <div class="trade-tickets-section">
                   <div class="section-title-row">
-                    <span class="sub-section-lbl">APPROVED TRADE TICKETS</span>
-                    <span class="verification-tag"><i class="ph ph-shield-check"></i> VERIFIED BY FINAL JUDGE</span>
+                    <span class="sub-section-lbl">{{ isNoTradeDecision ? '배분 드리프트 (참고)' : 'PROPOSED TRADE TICKETS' }}</span>
+                    <span v-if="!isNoTradeDecision" class="verification-tag"><i class="ph ph-shield-check"></i> VERIFIED BY FINAL JUDGE</span>
                   </div>
+                  <p v-if="isNoTradeDecision" class="no-trade-hint">현재 비중이 목표 범위 안이거나 즉시 실행 가능한 조정안이 없어 유지로 결정했습니다. 아래는 목표 대비 현재 비중(참고)이며, 실제 제안 거래가 아닙니다.</p>
                   <div class="tickets-list">
                     <div v-for="row in driftRows.slice(0, 2)" :key="row.key" class="ticket-row buy">
                       <div class="ticket-left">
                         <div class="direction-badge up"><i class="ph ph-arrow-up"></i></div>
                         <div class="ticket-info">
-                          <h4>REVIEW {{ row.label }}</h4>
+                          <h4>{{ isNoTradeDecision ? row.label : 'REVIEW ' + row.label }}</h4>
                           <span>{{ row.before }} → {{ row.after }}</span>
                         </div>
                       </div>
                       <div class="ticket-right">
                         <span class="val-amount">{{ row.after }}</span>
-                        <span class="exec-broker">EXECUTION: POLICY GATED</span>
+                        <span class="exec-broker">{{ isNoTradeDecision ? '현재 vs 목표' : 'EXECUTION: 승인 대기' }}</span>
                       </div>
                     </div>
                   </div>
