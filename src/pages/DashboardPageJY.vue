@@ -589,7 +589,7 @@ const historySessionCards = computed(() =>
 const historyTranscriptRows = computed(() => {
   const transcript = historySelected.value
   if (!transcript) return []
-  const skip = new Set(['run_preparing', 'node_started', 'node_completed'])
+  const skip = new Set(['run_preparing', 'node_started', 'node_completed', 'message', 'llm_prompt', 'llm_skipped'])
   return transcript.events
     .filter((event) => !skip.has(event.eventType))
     .map((event) => {
@@ -1986,7 +1986,7 @@ function credentialScopeLabel(scope: string | null | undefined): string {
 }
 
 function eventLabel(event: string): string {
-  return event.replaceAll('_', '_').toUpperCase()
+  return event.replaceAll('_', ' ').toUpperCase()
 }
 
 function userEventLabel(event: { event: string; data?: Record<string, unknown> }): string {
@@ -2123,6 +2123,7 @@ function compactVisibleEvents(events: Array<{ event: string; data?: Record<strin
 }
 
 function isVisibleRunEvent(event: { event: string; data?: Record<string, unknown> }): boolean {
+  if (event.event === 'message') return false
   if (event.event === 'llm_prompt') return false
   if (event.event === 'node_started' || event.event === 'node_completed') return false
   if (event.event === 'llm_skipped') return false
@@ -2266,6 +2267,9 @@ function userFacingError(value: string): string {
 
 function toUserFacingText(value: string): string {
   return value
+    .replace(/\*+/g, '')
+    .replace(/`+/g, '')
+    .replace(/(^|\n)\s{0,3}#{1,6}\s+/g, '$1')
     .replaceAll('DIRECT_ANSWER_UNAVAILABLE', '관련 자료 없음')
     .replaceAll('candidate_rebalance_plan', '리밸런싱 후보안')
     .replaceAll('action_required=false', '추가 승인 불필요')
