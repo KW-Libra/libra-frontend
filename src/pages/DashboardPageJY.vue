@@ -338,6 +338,20 @@ const latestAgentCompletedEvents = computed(() => {
   })
   return Array.from(byAgent.values())
 })
+const councilRationales = computed(() =>
+  latestAgentCompletedEvents.value
+    .map((event) => {
+      const rationale = [event.data.reasoning, event.data.opinion, event.data.limits_acknowledged, event.data.verdict]
+        .find((value) => typeof value === 'string' && value.trim())
+      if (!rationale) return null
+      return {
+        key: `${event.data.agent_id}-${event.data.turn_number ?? 0}`,
+        name: agentDisplayName(String(event.data.agent_id || 'agent')),
+        rationale: simplifyDecisionReason(String(rationale))
+      }
+    })
+    .filter((row): row is { key: string; name: string; rationale: string } => row !== null)
+)
 const latestFinalDecision = computed(() => {
   const draft = [...runStream.events].reverse().find((event) => event.event === 'final_decision_draft')
   if (draft?.event === 'final_decision_draft') {
@@ -493,15 +507,31 @@ const councilAgentCards = computed(() => {
     const key = String(streamEventField(event, 'agent_id') || streamEventField(event, 'actor') || streamEventField(event, 'node') || '').toLowerCase()
     if (key) activity.set(key, eventDetail(event))
   })
+  // Real per-agent confidence from agent_completed events (0-1 fraction). No live
+  // event for an agent => empty string so the card shows no fake confidence number.
+  const confidenceByAgent = new Map<string, string>()
+  latestAgentCompletedEvents.value.forEach((event) => {
+    const id = String(event.data.agent_id || '').toLowerCase()
+    if (id && typeof event.data.confidence === 'number') {
+      confidenceByAgent.set(id, `${Math.round(event.data.confidence * 100)}%`)
+    }
+  })
+  const confidenceFor = (...ids: string[]): string => {
+    for (const id of ids) {
+      const hit = confidenceByAgent.get(id)
+      if (hit) return hit
+    }
+    return ''
+  }
   return [
-    { id: 'core', name: 'Core Council', meta: 'PRIMARY GOVERNANCE / ID: CORE-HUB', icon: 'ph-briefcase', tone: 'dark', status: flowNodeStatus('core') || 'status-active', confidence: '99.1%', action: activity.get('core') || 'Synthesizing committee inputs for the current portfolio.' },
-    { id: 'risk', name: 'Risk Agent', meta: 'CONSTRAINT ENGINE / ID: RISK-04', icon: 'ph-shield-check', tone: 'yellow', status: flowNodeStatus('risk') || 'status-monitoring', confidence: '88.5%', action: activity.get('risk') || 'Checks concentration, volatility, drawdown, and liquidity constraints.' },
-    { id: 'news', name: 'News Agent', meta: 'EVIDENCE LAYER / ID: NEWS-12', icon: 'ph-chat-circle-text', tone: 'pink', status: flowNodeStatus('news') || 'status-active', confidence: '82.0%', action: activity.get('news') || 'Reads article bodies, disclosure context, and event summaries.' },
-    { id: 'report', name: 'Report Agent', meta: 'DOCUMENT EVIDENCE / ID: RPT-07', icon: 'ph-newspaper', tone: 'blue', status: 'status-active', confidence: '76.4%', action: activity.get('report') || 'Summarizes analyst and company report evidence when available.' },
-    { id: 'cost', name: 'Cost Agent', meta: 'EXECUTION POLICY / ID: COST-09', icon: 'ph-receipt', tone: 'purple', status: flowNodeStatus('cost') || 'status-standby', confidence: '91.3%', action: activity.get('cost') || 'Estimates fees, turnover, and minimum executable trade size.' },
-    { id: 'technical', name: 'Technical Agent', meta: 'PRICE FEATURES / ID: TECH-03', icon: 'ph-chart-line-up', tone: 'green', status: 'status-active', confidence: '84.8%', action: activity.get('technical') || 'Uses OHLCV momentum, volatility, drawdown, and liquidity features.' },
-    { id: 'mediator', name: 'Mediator Judge', meta: 'CONFLICT RESOLUTION / ID: MED-01', icon: 'ph-scales', tone: 'green', status: flowNodeStatus('mediator') || 'status-standby', confidence: '92.4%', action: activity.get('mediator') || 'Reconciles conflicting agent mandates into one rebalance intent.' },
-    { id: 'final', name: 'Final Judge', meta: 'FINAL APPROVAL / ID: JUDGE-01', icon: 'ph-gavel', tone: 'dark', status: flowNodeStatus('judge') || 'status-standby', confidence: '94.6%', action: activity.get('final_judge') || 'Approves HOLD, DEFER, REBALANCE, or manual review.' }
+    { id: 'core', name: 'Core Council', meta: 'PRIMARY GOVERNANCE / ID: CORE-HUB', icon: 'ph-briefcase', tone: 'dark', status: flowNodeStatus('core') || 'status-active', confidence: confidenceFor('core', 'core_council'), action: activity.get('core') || 'Synthesizing committee inputs for the current portfolio.' },
+    { id: 'risk', name: 'Risk Agent', meta: 'CONSTRAINT ENGINE / ID: RISK-04', icon: 'ph-shield-check', tone: 'yellow', status: flowNodeStatus('risk') || 'status-monitoring', confidence: confidenceFor('risk'), action: activity.get('risk') || 'Checks concentration, volatility, drawdown, and liquidity constraints.' },
+    { id: 'news', name: 'News Agent', meta: 'EVIDENCE LAYER / ID: NEWS-12', icon: 'ph-chat-circle-text', tone: 'pink', status: flowNodeStatus('news') || 'status-active', confidence: confidenceFor('news'), action: activity.get('news') || 'Reads article bodies, disclosure context, and event summaries.' },
+    { id: 'report', name: 'Report Agent', meta: 'DOCUMENT EVIDENCE / ID: RPT-07', icon: 'ph-newspaper', tone: 'blue', status: 'status-active', confidence: confidenceFor('report'), action: activity.get('report') || 'Summarizes analyst and company report evidence when available.' },
+    { id: 'cost', name: 'Cost Agent', meta: 'EXECUTION POLICY / ID: COST-09', icon: 'ph-receipt', tone: 'purple', status: flowNodeStatus('cost') || 'status-standby', confidence: confidenceFor('cost'), action: activity.get('cost') || 'Estimates fees, turnover, and minimum executable trade size.' },
+    { id: 'technical', name: 'Technical Agent', meta: 'PRICE FEATURES / ID: TECH-03', icon: 'ph-chart-line-up', tone: 'green', status: 'status-active', confidence: confidenceFor('technical'), action: activity.get('technical') || 'Uses OHLCV momentum, volatility, drawdown, and liquidity features.' },
+    { id: 'mediator', name: 'Mediator Judge', meta: 'CONFLICT RESOLUTION / ID: MED-01', icon: 'ph-scales', tone: 'green', status: flowNodeStatus('mediator') || 'status-standby', confidence: confidenceFor('mediator'), action: activity.get('mediator') || 'Reconciles conflicting agent mandates into one rebalance intent.' },
+    { id: 'final', name: 'Final Judge', meta: 'FINAL APPROVAL / ID: JUDGE-01', icon: 'ph-gavel', tone: 'dark', status: flowNodeStatus('judge') || 'status-standby', confidence: confidenceFor('final_judge', 'final', 'judge'), action: activity.get('final_judge') || 'Approves HOLD, DEFER, REBALANCE, or manual review.' }
   ]
 })
 
@@ -626,27 +656,18 @@ const agentFailurePoints = computed(() => {
   ]
 })
 
-const driftRows = computed(() => {
-  const demo = DEMO_PORTFOLIO.slice(0, 4).map((asset) => ({
+const driftRows = computed(() =>
+  // Reuse the real weight + policy-derived target from portfolioHoldingCards
+  // (which already falls back to DEMO_PORTFOLIO when there is no live balance),
+  // instead of a synthetic clamp on the current weight.
+  portfolioHoldingCards.value.slice(0, 4).map((asset) => ({
     key: asset.key,
     label: asset.ticker,
-    before: `${asset.weight.toFixed(1)}%`,
-    after: `${asset.target.toFixed(1)}%`,
-    width: Math.max(6, Math.min(100, asset.target))
+    before: `${asset.weightPct.toFixed(1)}%`,
+    after: `${asset.targetPct.toFixed(1)}%`,
+    width: Math.max(6, Math.min(100, asset.weightPct))
   }))
-  if (!holdings.value.length || totalValue.value <= 0) return demo
-  return holdings.value.slice(0, 4).map((holding) => {
-    const valuation = toNumber(holding.valuationAmount) ?? 0
-    const weight = totalValue.value > 0 ? (valuation / totalValue.value) * 100 : 0
-    return {
-      key: holding.symbol,
-      label: holding.name || holding.symbol,
-      before: `${weight.toFixed(1)}%`,
-      after: `${Math.min(30, Math.max(5, weight)).toFixed(1)}%`,
-      width: Math.max(6, Math.min(100, weight))
-    }
-  })
-})
+)
 
 const memoryNodes = computed(() => {
   const activity = new Map<string, Level>()
@@ -1173,25 +1194,13 @@ const logRows = computed(() => {
         tone: 'neutral' as Tone
       }]
     }
-    const events = [
-      'RISK_EVAL_PASS [0x37BA]',
-      'PORTFOLIO_SYNC_OK [0x11A4]',
-      'COMPLIANCE_PASS [0x2F90]',
-      'WEIGHTS_CALCULATED [0x55CC]',
-      'LIMIT_CHECK_PASS [0x8D31]',
-      'REST_API_PING [0x1AF0]',
-      'WS_TICK_RCV [0x0A21]',
-      'ORDER_SIMULATED [0x51F2]',
-      'REBALANCE_NOT_REQUIRED [0x71DD]',
-      'SEQ_INIT [0x02B4]'
-    ]
-    return events.map((event, index) => ({
-      key: `demo-${index}`,
-      time: formatTime(new Date(Date.now() - index * 18_000).toISOString()),
-      label: event,
+    return [{
+      key: 'empty',
+      time: '',
+      label: '표시할 이벤트가 없습니다.',
       detail: '',
       tone: 'neutral' as Tone
-    }))
+    }]
   }
   return [...streamRows, ...auditRows]
 })
@@ -2691,12 +2700,12 @@ function errorMessage(err: unknown): string {
                     <span class="ca-dot"></span>
                     <span>CORE ANALYSIS</span>
                   </div>
-                  <p>"The council separates evidence agents, mediator conflict resolution, final judge approval, and execution policy validation before any order is created."</p>
+                  <p>"위원회는 주문을 생성하기 전에 근거 수집 에이전트, 중재자의 충돌 조정, 최종 판단자의 승인, 실행 정책 검증을 단계별로 분리해 처리합니다."</p>
                 </div>
               </div>
               <button type="button" class="btn-apply-settings" @click="applyAgentSettings">Apply Settings</button>
               <button type="button" class="btn-reset-default" @click="resetAgentSession">Reset Session</button>
-              <p class="settings-disclaimer">Changing agent policy affects the next live analysis session only. Historical run logs remain immutable.</p>
+              <p class="settings-disclaimer">에이전트 정책 변경은 다음 실시간 분석 세션에만 반영됩니다. 과거 실행 로그는 변경되지 않습니다.</p>
             </div>
           </div>
         </div>
@@ -2758,7 +2767,6 @@ function errorMessage(err: unknown): string {
                           <span class="agent-desc-display">Volatility & Exposure</span>
                         </div>
                       </div>
-                      <div class="agent-card-status"><span class="status-dot green"></span> Active</div>
                     </div>
                     <div class="active-agent-card readonly" data-agent="macro">
                       <div class="agent-card-left">
@@ -2768,7 +2776,6 @@ function errorMessage(err: unknown): string {
                           <span class="agent-desc-display">Economic Indicators</span>
                         </div>
                       </div>
-                      <div class="agent-card-status"><span class="status-dot green"></span> Active</div>
                     </div>
                     <div class="active-agent-card readonly" data-agent="tax">
                       <div class="agent-card-left">
@@ -2778,7 +2785,6 @@ function errorMessage(err: unknown): string {
                           <span class="agent-desc-display">Fees & Turnover</span>
                         </div>
                       </div>
-                      <div class="agent-card-status"><span class="status-dot green"></span> Active</div>
                     </div>
                     <div class="active-agent-card readonly" data-agent="sentiment">
                       <div class="agent-card-left">
@@ -2788,7 +2794,6 @@ function errorMessage(err: unknown): string {
                           <span class="agent-desc-display">News & Disclosure</span>
                         </div>
                       </div>
-                      <div class="agent-card-status"><span class="status-dot green"></span> Active</div>
                     </div>
                   </div>
                 </div>
@@ -3129,31 +3134,20 @@ function errorMessage(err: unknown): string {
                       </div>
                     </div>
                   </div>
-                  <div class="view-more-transactions">
+                  <div class="view-more-transactions" role="button" tabindex="0" style="cursor: pointer;" @click="setAgentSubtab('history')" @keydown.enter="setAgentSubtab('history')">
                     <i class="ph ph-plus"></i> VIEW FULL DECISION TRACE
                   </div>
                 </div>
 
                 <div class="rationales-section">
                   <span class="sub-section-lbl">COUNCIL RATIONALES</span>
-                  <div class="rationales-grid">
-                    <div class="rationale-card">
-                      <div class="rat-header"><div class="rat-icon risk"><i class="ph ph-shield-check"></i></div><span>RISK AGENT</span></div>
-                      <p>Validated exposure limits, concentration policy, liquidity coverage, and drawdown state.</p>
-                    </div>
-                    <div class="rationale-card">
-                      <div class="rat-header"><div class="rat-icon macro"><i class="ph ph-globe-hemisphere-west"></i></div><span>PROFIT AGENT</span></div>
-                      <p>Compared recent performance and portfolio drift before authorizing a rebalance intent.</p>
-                    </div>
-                    <div class="rationale-card">
-                      <div class="rat-header"><div class="rat-icon tax"><i class="ph ph-receipt"></i></div><span>COST AGENT</span></div>
-                      <p>Checked turnover, trading cost, and minimum order constraints before execution.</p>
-                    </div>
-                    <div class="rationale-card">
-                      <div class="rat-header"><div class="rat-icon sentiment"><i class="ph ph-chat-circle-text"></i></div><span>NEWS AGENT</span></div>
-                      <p>Used article-body evidence and disclosure context as qualitative confirmation signals.</p>
+                  <div v-if="councilRationales.length" class="rationales-grid">
+                    <div v-for="rationale in councilRationales" :key="rationale.key" class="rationale-card">
+                      <div class="rat-header"><div class="rat-icon"><i class="ph ph-robot"></i></div><span>{{ rationale.name }}</span></div>
+                      <p>{{ rationale.rationale }}</p>
                     </div>
                   </div>
+                  <p v-else class="no-trade-hint">이번 심의의 에이전트 근거가 아직 없습니다.</p>
                 </div>
               </div>
             </div>
@@ -3402,7 +3396,7 @@ function errorMessage(err: unknown): string {
                     <span class="amc-stat-lbl">SYSTEM STATUS</span>
                     <span class="amc-status-tag" :class="agent.status">{{ agent.status.replace('status-', '').toUpperCase() }}</span>
                   </div>
-                  <div class="amc-stat-box">
+                  <div v-if="agent.confidence" class="amc-stat-box">
                     <span class="amc-stat-lbl">CONFIDENCE</span>
                     <strong class="amc-conf-val">{{ agent.confidence }}</strong>
                     <div class="amc-conf-bar"><div class="amc-conf-fill" :style="{ width: agent.confidence }"></div></div>

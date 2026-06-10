@@ -4249,6 +4249,8 @@
   justify-content: center;
   font-size: 18px;
   flex-shrink: 0;
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--color-text-main);
 }
 
 #agent-view-success .rat-icon.risk      { background: rgba(245, 158, 11, 0.14); color: #f59e0b; }
