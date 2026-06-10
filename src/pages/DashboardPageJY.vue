@@ -392,6 +392,20 @@ const manualReviewActions = computed<ManualReviewAction[]>(() => {
     })
     .filter((item): item is ManualReviewAction => !!item)
 })
+const manualReviewPlan = computed(() => {
+  const pending = runStream.pendingInterrupt as Record<string, unknown> | null
+  const plan = pending?.candidate_rebalance_plan
+  if (!plan || typeof plan !== 'object') return []
+  const nameByTicker = new Map(holdings.value.map((h) => [h.symbol, h.name]))
+  return Object.entries(plan as Record<string, number>)
+    .map(([ticker, delta]) => ({
+      ticker,
+      name: nameByTicker.get(ticker) || ticker,
+      deltaPct: Number(delta) * 100
+    }))
+    .filter((row) => Number.isFinite(row.deltaPct) && Math.abs(row.deltaPct) >= 0.05)
+    .sort((a, b) => b.deltaPct - a.deltaPct)
+})
 const councilFlowState = computed(() => {
   const state = {
     completedAgents: new Map<FlowNodeKey, string[]>(),
@@ -3239,6 +3253,18 @@ function errorMessage(err: unknown): string {
                   <div v-for="row in agentFailurePoints" :key="row.key" class="conflict-point-row">
                     <strong class="point-title">{{ row.sender }}</strong>
                     <p>{{ row.text }}</p>
+                  </div>
+                </div>
+              </div>
+              <div v-if="isManualReview && manualReviewPlan.length" class="console-card conflict-points-card jy-review-plan-card">
+                <div class="card-header-simple"><h3>제안된 리밸런싱 초안 · {{ manualReviewPlan.length }}종목</h3></div>
+                <div class="conflict-points-list">
+                  <div v-for="row in manualReviewPlan" :key="row.ticker" class="conflict-point-row jy-review-plan-row">
+                    <strong class="point-title">{{ row.name }} <span class="jy-review-ticker">{{ row.ticker }}</span></strong>
+                    <span
+                      class="jy-review-delta"
+                      :style="{ color: row.deltaPct >= 0 ? 'var(--color-success, #2e7d32)' : 'var(--color-danger, #c62828)' }"
+                    >{{ row.deltaPct >= 0 ? '비중 확대 +' : '비중 축소 ' }}{{ row.deltaPct.toFixed(1) }}%p</span>
                   </div>
                 </div>
               </div>
