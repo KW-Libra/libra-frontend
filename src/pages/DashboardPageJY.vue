@@ -4853,4 +4853,311 @@ function errorMessage(err: unknown): string {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   MOBILE RESPONSIVE (QR / phone 360–414px) — layout-only overrides.
+   Content & colors unchanged; desktop (>768px) layout untouched.
+   ========================================================================== */
+
+/* ---- Page-level overflow guard (item 4) ---- */
+@media (max-width: 768px) {
+  .jy-dashboard-host {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  .jy-dashboard-host #dashboard-page,
+  .jy-dashboard-host .zone-light,
+  .jy-dashboard-host .zone-dark,
+  .jy-dashboard-host .tab-view-content {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+/* ---- 768px: stack wide multi-column grids, scrollable nav strips ---- */
+@media (max-width: 768px) {
+  /* Top nav strip: keep on one line, allow horizontal scroll (item 2) */
+  .jy-dashboard-host .notch-nav {
+    left: 10px;
+    right: 10px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .jy-dashboard-host .notch-nav-links {
+    flex-wrap: nowrap;
+  }
+
+  .jy-dashboard-host .notch-link {
+    padding: 8px 11px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Agent subtabs (Settings / Visualize / History) — scroll instead of overflow (item 2) */
+  .jy-dashboard-host .agent-subtabs-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .jy-dashboard-host .agent-subtabs-left {
+    width: 100%;
+    gap: 14px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .jy-dashboard-host .agent-subtabs-left::-webkit-scrollbar {
+    display: none;
+  }
+
+  .jy-dashboard-host .agent-subtab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* HUD header (노드 모니터 + 로그아웃/다크/리밸런스) — let title + buttons wrap (item 2) */
+  .jy-dashboard-host .hud-title-wrap,
+  .jy-dashboard-host .hud-time-wrap {
+    flex-wrap: wrap;
+  }
+
+  /* Agent visualize: Initialize Council (init) + Resolved (success) — single column (item 1/5) */
+  .jy-dashboard-host #agent-view-init.agent-vis-layout,
+  .jy-dashboard-host #agent-view-success.agent-vis-layout {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    height: auto;
+    gap: 20px;
+  }
+
+  .jy-dashboard-host #agent-view-init,
+  .jy-dashboard-host #agent-view-success {
+    min-height: 0;
+  }
+
+  .jy-dashboard-host #agent-view-init .agent-flow-column,
+  .jy-dashboard-host #agent-view-init .agent-console-column,
+  .jy-dashboard-host #agent-view-success .agent-flow-column,
+  .jy-dashboard-host #agent-view-success .agent-console-column {
+    height: auto;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  /* Settings: Portfolio Configuration form + SESSION STATE summary — stack (item 1) */
+  .jy-dashboard-host .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    gap: 20px;
+  }
+
+  /* Settings inner 2-up card row — stack */
+  .jy-dashboard-host .settings-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Strategic mode cards (3-up) + active agent nodes (2-up) — stack (item 1) */
+  .jy-dashboard-host #agent-view-init .strategic-modes-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .jy-dashboard-host #agent-view-init .active-agents-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Init summary/config cards padding */
+  .jy-dashboard-host #agent-view-init .init-summary-card,
+  .jy-dashboard-host #agent-view-init .init-config-card {
+    padding: 20px;
+  }
+
+  /* History: RECENT DELIBERATIONS list + SESSION TRANSCRIPT — stack, drop fixed height (item 5) */
+  .jy-dashboard-host .history-board {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .jy-dashboard-host .history-content {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .jy-dashboard-host .history-transcript-head {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Agent Council Replay bubbles fit width (item 5) */
+  .jy-dashboard-host .history-transcript-feed,
+  .jy-dashboard-host .transcript-feed-area {
+    max-width: 100%;
+  }
+
+  .jy-dashboard-host .ht-bubble,
+  .jy-dashboard-host .debate-text {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* AMC popup grid (3-up) + radio groups — stack */
+  .jy-dashboard-host .modal-radio-group {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* ---- 640px: full single column, shrink display type, tighten paddings ---- */
+@media (max-width: 640px) {
+  /* Section paddings (item 3) */
+  .jy-dashboard-host .zone-dark {
+    padding: 18px 18px 0 18px;
+  }
+
+  .jy-dashboard-host .zone-light {
+    padding: 12px 16px 40px 16px;
+  }
+
+  .jy-dashboard-host.dashboard-tab-active .zone-light {
+    padding-inline: 14px;
+  }
+
+  /* Cards never exceed viewport (item 4) */
+  .jy-dashboard-host .agent-vis-card,
+  .jy-dashboard-host .console-card,
+  .jy-dashboard-host .settings-board,
+  .jy-dashboard-host .history-board,
+  .jy-dashboard-host .account-console {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Dashboard total asset value (~50px → smaller) (item 3) */
+  .jy-dashboard-host .terminal-dash .td-hero-value {
+    font-size: clamp(28px, 9vw, 38px);
+  }
+
+  .jy-dashboard-host .terminal-dash .td-hero {
+    padding: 18px 18px;
+  }
+
+  /* PORTFOLIO VALUE chart fits width (item 5) */
+  .jy-dashboard-host .terminal-dash .td-chart-canvas {
+    min-height: 130px;
+  }
+
+  /* Big display headings (Intelligent Asset Allocation / Initialize Council /
+     Portfolio Configuration / Rebalance Resolved / Logs History) (item 3) */
+  .jy-dashboard-host .jy-init-title h2,
+  .jy-dashboard-host #agent-view-init .deadlock-title-group h2,
+  .jy-dashboard-host #agent-view-success .header-title-area h2,
+  .jy-dashboard-host .settings-title,
+  .jy-dashboard-host .history-title {
+    font-size: clamp(28px, 8vw, 34px) !important;
+    line-height: 1.1 !important;
+  }
+
+  .jy-dashboard-host #agent-view-init .deadlock-title-group {
+    margin-top: 20px !important;
+    margin-bottom: 28px !important;
+  }
+
+  /* Init / success / settings / history board paddings */
+  .jy-dashboard-host #agent-view-init .agent-vis-card.init-board,
+  .jy-dashboard-host #agent-view-success .agent-vis-card.success-board,
+  .jy-dashboard-host .settings-board {
+    padding: 24px 20px 24px !important;
+    border-radius: 22px;
+  }
+
+  .jy-dashboard-host .history-board {
+    padding: 24px 18px 28px;
+    border-radius: 22px;
+  }
+
+  /* Success header: badge is absolutely placed w/ padding-right:220px on desktop —
+     reflow it inline so the title isn't cut off (item 5) */
+  .jy-dashboard-host #agent-view-success .header-title-area {
+    padding-right: 0;
+  }
+
+  .jy-dashboard-host #agent-view-success .header-title-area .vis-badge {
+    position: static;
+    margin-bottom: 10px;
+  }
+
+  .jy-dashboard-host #agent-view-success .header-actions-area {
+    flex-wrap: wrap;
+  }
+
+  .jy-dashboard-host #agent-view-success .success-checkmark-circle {
+    font-size: 5rem !important;
+  }
+
+  /* Trade ticket rows + drift display — stack their inner content (item 5) */
+  .jy-dashboard-host #agent-view-success .ticket-row {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px 18px !important;
+  }
+
+  .jy-dashboard-host #agent-view-success .ticket-left {
+    gap: 12px;
+  }
+
+  /* Manual-review approval cards + rebalance draft rows already in a single
+     console column; ensure their action buttons + rows wrap (item 5) */
+  .jy-dashboard-host .manual-review-actions,
+  .jy-dashboard-host .deadlock-actions-area {
+    flex-wrap: wrap;
+  }
+
+  /* Dashboard 3-col rail already stacks (1100px); keep left rail nav usable */
+  .jy-dashboard-host .terminal-dash .td-rail-left {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Drift / consensus bar rows — narrow the fixed label column so the bar fits */
+  .jy-dashboard-host .consensus-bar-row {
+    grid-template-columns: 72px minmax(0, 1fr) 28px;
+    gap: 8px;
+  }
+
+  /* Logs / trace lines (180px label + value) — stack to one column */
+  .jy-dashboard-host .trace-line {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
+/* ---- 480px: tightest phones — single-column heatmap & calendar polish ---- */
+@media (max-width: 480px) {
+  /* PORTFOLIO holdings calendar heatmap (7-up → 5-up at 760) — keep compact */
+  .jy-dashboard-host .terminal-dash .td-calendar-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .jy-dashboard-host .terminal-dash .td-calendar-cell {
+    min-height: 46px;
+    padding: 6px;
+    font-size: 10px;
+  }
+
+  /* AMC popup radio group fully single column */
+  .jy-dashboard-host .modal-radio-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 </style>

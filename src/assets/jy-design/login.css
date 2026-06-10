@@ -409,6 +409,40 @@
     }
 }
 
+/* 휴대폰(QR 진입, 360–414px) — Authenticate 카드 풀폭/가운데, 잘림 방지 */
+@media (max-width: 640px) {
+    #login-page {
+        overflow-x: hidden;
+    }
+    .layout-grid {
+        padding: var(--space-md);
+        height: auto;
+        min-height: 100vh;
+    }
+    .auth-wrapper {
+        padding-right: 0;
+        justify-content: center;
+    }
+    .auth-panel {
+        width: 100%;
+        max-width: 100%;
+        padding: 32px 22px;
+        border-radius: 28px;
+        gap: 24px;
+    }
+    #login-page h1 {
+        font-size: 32px;
+    }
+    .top-bar {
+        top: 16px;
+        right: 16px;
+    }
+    .label-top-left {
+        top: 16px;
+        left: 16px;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     #login-page * {
         animation: none !important;
