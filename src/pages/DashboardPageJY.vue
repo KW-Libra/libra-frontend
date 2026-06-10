@@ -7,6 +7,8 @@ import type { RunStartBody } from '@/api/sse'
 import { useAuthStore } from '@/stores/auth'
 import { useRunStreamStore } from '@/stores/runStream'
 import { useAgentHistory } from '@/composables/useAgentHistory'
+import { useIsMobile } from '@/composables/useIsMobile'
+import MobileConsole from '@/pages/MobileConsole.vue'
 import type {
   DecimalValue,
   KisBalance,
@@ -212,6 +214,7 @@ const DEMO_AGENT_OPINIONS: Array<{
 const router = useRouter()
 const auth = useAuthStore()
 const runStream = useRunStreamStore()
+const { isMobile } = useIsMobile()
 const {
   runs: historyRuns,
   selected: historySelected,
@@ -2334,7 +2337,8 @@ function errorMessage(err: unknown): string {
 </script>
 
 <template>
-  <div class="jy-dashboard-host" :class="{ 'dark-theme': isDarkTheme, 'dashboard-tab-active': activeTab === 'dashboard' }">
+  <MobileConsole v-if="isMobile" />
+  <div v-else class="jy-dashboard-host" :class="{ 'dark-theme': isDarkTheme, 'dashboard-tab-active': activeTab === 'dashboard' }">
     <div class="noise-overlay"></div>
     <section id="dashboard-page" class="view-section">
     <nav class="notch-nav" aria-label="primary">
