@@ -2310,6 +2310,11 @@ function agentDisplayName(agentId: string): string {
   if (normalized.includes('liquidity')) return '유동성 에이전트'
   if (normalized.includes('cost')) return '비용 에이전트'
   if (normalized.includes('profit') || normalized.includes('fundamental')) return '수익성 에이전트'
+  if (normalized.includes('tax')) return '세금 에이전트'
+  if (normalized.includes('execution')) return '실행 에이전트'
+  if (normalized.includes('esg')) return 'ESG 에이전트'
+  if (normalized.includes('macro')) return '거시 에이전트'
+  if (normalized.includes('sentiment')) return '감성 에이전트'
   if (normalized.includes('judge') || normalized.includes('final')) return '최종 판단자'
   if (normalized.includes('mediator')) return '중재자'
   return agentId.replaceAll('_', ' ').toUpperCase()
