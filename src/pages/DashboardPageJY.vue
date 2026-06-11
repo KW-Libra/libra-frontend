@@ -350,7 +350,7 @@ const councilRationales = computed(() =>
       return {
         key: `${event.data.agent_id}-${event.data.turn_number ?? 0}`,
         name: agentDisplayName(String(event.data.agent_id || 'agent')),
-        rationale: simplifyDecisionReason(String(rationale))
+        rationale: simplifyDecisionReason(String(rationale), 0)
       }
     })
     .filter((row): row is { key: string; name: string; rationale: string } => row !== null)
@@ -2235,7 +2235,7 @@ function summarizeOutputString(value: string): string {
   return truncateText(toUserFacingText(trimmed), 320)
 }
 
-function simplifyDecisionReason(value: string): string {
+function simplifyDecisionReason(value: string, maxLength = 320): string {
   const text = toUserFacingText(value)
   if ((text.includes('근거') || text.includes('자료')) && (text.includes('없') || text.includes('부족'))) {
     return '해당 에이전트에서 강한 조정 신호가 확인되지 않았습니다.'
@@ -2246,7 +2246,7 @@ function simplifyDecisionReason(value: string): string {
   if (text.includes('실행 가능한 거래') || text.includes('리밸런싱 후보안')) {
     return '실행할 만한 리밸런싱 후보가 없어 현재 포트폴리오를 유지합니다.'
   }
-  return truncateText(text, 320)
+  return maxLength > 0 ? truncateText(text, maxLength) : text
 }
 
 function directionLabel(value: number): string {

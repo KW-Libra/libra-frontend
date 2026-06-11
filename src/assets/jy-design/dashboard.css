@@ -1972,6 +1972,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 10px;
+  align-items: start;
 }
 
 .rationale-card {
@@ -1979,6 +1980,8 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 12px;
+  max-height: 380px;
+  overflow-y: auto;
 }
 
 .dark-theme .rationale-card {
