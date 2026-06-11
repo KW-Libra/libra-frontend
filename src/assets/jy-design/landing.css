@@ -1061,3 +1061,37 @@ body:not(.dark-theme) #landing-page .spline-glow {
   stroke: rgba(59, 130, 246, 0.18);
 }
 
+/* ==========================================================================
+   모바일 반응형 (QR 폰 접속 첫 화면) — 데스크톱 레이아웃 불변, @media 만 추가
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* 상단 네비: 폭 부족으로 '대시보드 시작하기' CTA 글자가 세로로 깨지던 것 수정 */
+  #landing-page nav {
+    top: 14px;
+    gap: 14px;
+    padding: 9px 14px;
+    max-width: calc(100% - 24px);
+  }
+  #landing-page .nav-links { gap: 12px; }
+  #landing-page .nav-links a { display: none; }            /* Agents/Features 링크는 폰에서 숨김 */
+  #landing-page .nav-links .btn-primary-outline {
+    white-space: nowrap;                                   /* 세로 줄바꿈 방지 */
+    font-size: 12px;
+    padding: 7px 13px;
+  }
+  #landing-page main { padding: 90px 20px 0; }
+}
+
+@media (max-width: 640px) {
+  #landing-page h1 { font-size: clamp(34px, 9vw, 46px); margin-bottom: 20px; }
+  #landing-page p.subhead { font-size: 16px; margin-bottom: 26px; max-width: 100%; }
+  #landing-page .hero-section { min-height: auto; padding: 16px 0; gap: 28px; }
+  #landing-page .hero-features { margin: 22px 0 28px; gap: 12px; }
+  #landing-page .hero-features li { font-size: 14px; }
+  #landing-page .canvas-section { display: none; }         /* 폰에선 3D 노드 시각화 숨김(겹침·어수선 방지) */
+  #landing-page main { padding: 84px 16px 0; gap: 28px; }
+  #landing-page .glass-panel { padding: 22px; border-radius: 22px; }
+  #landing-page .log-panel { height: 300px; }
+  #landing-page footer { margin-top: 40px !important; padding: 32px 0 !important; }
+}
+
